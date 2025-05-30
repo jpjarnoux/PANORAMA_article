@@ -16,6 +16,12 @@ PANORAMA is freely available and accessible through:
 [https://github.com/jpjarnoux/PANORAMA](https://github.com/jpjarnoux/PANORAMA)
 
 ## Authors
+- Jérôme Arnoux, LABGeM, Genomics Metabolics, CEA, Genoscope, Institut François Jacob, Université d’Évry, Université Paris-Saclay, CNRS
+- Jean Mainguy, LABGeM, Genomics Metabolics, CEA, Genoscope, Institut François Jacob, Université d’Évry, Université Paris-Saclay, CNRS
+- Laura Bry, LABGeM, Genomics Metabolics, CEA, Genoscope, Institut François Jacob, Université d’Évry, Université Paris-Saclay, CNRS
+- Quentin Fernandez De Grado, LABGeM, Genomics Metabolics, CEA, Genoscope, Institut François Jacob, Université d’Évry, Université Paris-Saclay, CNRS
+- David Vallenet, LABGeM, Genomics Metabolics, CEA, Genoscope, Institut François Jacob, Université d’Évry, Université Paris-Saclay, CNRS
+- Alexandra Calteau, LABGeM, Genomics Metabolics, CEA, Genoscope, Institut François Jacob, Université d’Évry, Université Paris-Saclay, CNRS
 
 ## Dependencies
 
