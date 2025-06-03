@@ -1,0 +1,12 @@
+name: panorama_notebook
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - pandas>=2.2.3,<3.0
+  - ipykernel>=6.29.5
+  - jupyter>=1.1.1
+  - tqdm>=4.67.1
+  - seaborn>=0.13.2
+  - networkx>=3.4.2
