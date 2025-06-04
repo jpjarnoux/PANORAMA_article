@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # local libraries
-from sources.dev_utils import subtype2type, cluster_low_sys
+from sources.dev_utils import type2category, cluster_low_sys
 
 
 def gen_boxplot(count_df: pd.DataFrame, output: Path) -> Tuple[Set[str], Set[str]]:
@@ -28,7 +28,7 @@ def gen_boxplot(count_df: pd.DataFrame, output: Path) -> Tuple[Set[str], Set[str
     # Add a 'Group' column to the DataFrame
     count_df.reset_index(inplace=True)
     count_df.rename(columns={'index': 'systems'}, inplace=True)
-    count_df['Group'] = count_df['systems'].map(subtype2type)
+    count_df['Group'] = count_df['systems'].map(type2category)
 
     # Summarize counts by group
     sum_df = count_df.groupby('Group').sum(numeric_only=True).T.sum(numeric_only=True).T
