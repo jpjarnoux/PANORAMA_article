@@ -7,6 +7,7 @@ from pathlib import Path
 
 # Installed libraries
 from itertools import chain
+from collections import defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
@@ -16,33 +17,32 @@ from matplotlib_venn import venn3
 from sources.dev_utils import similar
 
 
-def compare_sets(A: Set[FrozenSet[str]], B: Set[FrozenSet[str]], C: Set[FrozenSet[str]], threshold: float) -> Dict:
+def compare_sets(set_a: Set[FrozenSet[str]], set_b: Set[FrozenSet[str]], set_c: Set[FrozenSet[str]]) -> Dict:
     """Compare three sets and find unique and common elements among them.
 
     Args:
-        A (Set[FrozenSet[str]]): First set of frozensets to compare.
-        B (Set[FrozenSet[str]]): Second set of frozensets to compare.
-        C (Set[FrozenSet[str]]): Third set of frozensets to compare.
-        threshold (float): Threshold for similarity.
+        set_a (Set[FrozenSet[str]]): First set of frozensets to compare.
+        set_b (Set[FrozenSet[str]]): Second set of frozensets to compare.
+        set_c (Set[FrozenSet[str]]): Third set of frozensets to compare.
 
     Returns:
         Dict: A dictionary with counts and frozensets categorized by their intersections.
     """
     # Create unique sets from nested lists
-    unique_A = set(chain(*A))
-    unique_B = set(chain(*B))
-    unique_C = set(chain(*C))
+    unique_a = set(chain(*set_a))
+    unique_b = set(chain(*set_b))
+    unique_c = set(chain(*set_c))
 
     # Find intersections
-    common_ABC = unique_A & unique_B & unique_C
-    common_AB = (unique_A & unique_B) - common_ABC
-    common_AC = (unique_A & unique_C) - common_ABC
-    common_BC = (unique_B & unique_C) - common_ABC
+    common_abc = unique_a & unique_b & unique_c
+    common_ab = (unique_a & unique_b) - common_abc
+    common_ac = (unique_a & unique_c) - common_abc
+    common_bc = (unique_b & unique_c) - common_abc
 
     # Find unique elements
-    unique_A -= (common_ABC | common_AB | common_AC)
-    unique_B -= (common_ABC | common_AB | common_BC)
-    unique_C -= (common_ABC | common_AC | common_BC)
+    unique_a -= (common_abc | common_ab | common_ac)
+    unique_b -= (common_abc | common_ab | common_bc)
+    unique_c -= (common_abc | common_ac | common_bc)
 
     def find_frozensets(category: Set[str]) -> Dict[str, Set[FrozenSet[str]]]:
         """Find frozensets associated with each category.
@@ -53,7 +53,7 @@ def compare_sets(A: Set[FrozenSet[str]], B: Set[FrozenSet[str]], C: Set[FrozenSe
         Returns:
             Dict[str, Set[FrozenSet[str]]]: A dictionary of frozensets categorized by their presence in the sets.
         """
-        mapping = {"A": A, "B": B, "C": C}
+        mapping = {"A": set_a, "B": set_b, "C": set_c}
         result = {k: set() for k in mapping}
 
         for key, group in mapping.items():
@@ -65,40 +65,38 @@ def compare_sets(A: Set[FrozenSet[str]], B: Set[FrozenSet[str]], C: Set[FrozenSe
 
     # Build the dictionary of frozensets
     frozenset_dict = {
-        "111": find_frozensets(common_ABC),
-        "110": find_frozensets(common_AB),
-        "101": find_frozensets(common_AC),
-        "011": find_frozensets(common_BC),
-        "100": find_frozensets(unique_A),
-        "010": find_frozensets(unique_B),
-        "001": find_frozensets(unique_C),
+        "111": find_frozensets(common_abc),
+        "110": find_frozensets(common_ab),
+        "101": find_frozensets(common_ac),
+        "011": find_frozensets(common_bc),
+        "100": find_frozensets(unique_a),
+        "010": find_frozensets(unique_b),
+        "001": find_frozensets(unique_c),
     }
 
     # Return the results
     return {
         "counts": {
-            "111": len(common_ABC),
-            "110": len(common_AB),
-            "101": len(common_AC),
-            "011": len(common_BC),
-            "100": len(unique_A),
-            "010": len(unique_B),
-            "001": len(unique_C),
+            "111": len(common_abc),
+            "110": len(common_ab),
+            "101": len(common_ac),
+            "011": len(common_bc),
+            "100": len(unique_a),
+            "010": len(unique_b),
+            "001": len(unique_c),
         },
         "frozensets": frozenset_dict,
     }
 
 
 def get_common_specified_systems(padloc: Dict[str, Set[FrozenSet[str]]], dfinder: Dict[str, Set[FrozenSet[str]]],
-                                 panorama: Dict[str, Set[FrozenSet[str]]],
-                                 threshold: float = 0.8) -> Dict[str, int]:
+                                 panorama: Dict[str, Set[FrozenSet[str]]]) -> Dict[str, int]:
     """Calculate common and specific systems among three tools.
 
     Args:
         padloc (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for PADLOC.
         dfinder (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for DFinder.
         panorama (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for PANORAMA.
-        threshold (float): Threshold for similarity.
 
     Returns:
         Dict: A dictionary containing subset counts.
@@ -112,7 +110,7 @@ def get_common_specified_systems(padloc: Dict[str, Set[FrozenSet[str]]], dfinder
         dfinder_systems = dfinder.get(sys_type, set())
         panorama_systems = panorama.get(sys_type, set())
 
-        comp_dict = compare_sets(padloc_systems, dfinder_systems, panorama_systems, threshold)
+        comp_dict = compare_sets(padloc_systems, dfinder_systems, panorama_systems)
 
         for k, v in comp_dict['counts'].items():
             subset_dict[k] += v
@@ -121,7 +119,7 @@ def get_common_specified_systems(padloc: Dict[str, Set[FrozenSet[str]]], dfinder
 
 
 def plot_venn_diagram(padloc: Dict[str, Set[FrozenSet[str]]], dfinder: Dict[str, Set[FrozenSet[str]]],
-                      panorama: Dict[str, Set[FrozenSet[str]]], output: Path, threshold: float = 0.5) -> None:
+                      panorama: Dict[str, Set[FrozenSet[str]]], output: Path) -> None:
     """Generate and display a Venn diagram comparing the systems detected by different tools.
 
     Args:
@@ -129,16 +127,15 @@ def plot_venn_diagram(padloc: Dict[str, Set[FrozenSet[str]]], dfinder: Dict[str,
         dfinder (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for DFinder.
         panorama (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for PANORAMA.
         output (Path): Path to save the Venn diagram.
-        threshold (float): Threshold for similarity.
     """
     n_padloc = sum([len(x) for x in padloc.values()])
     n_df = sum([len(x) for x in dfinder.values()])
     n_panorama = sum([len(x) for x in panorama.values()])
     print(f"\nNumber of pangenome systems: PADLOC {n_padloc}, DFINDER {n_df}, PANORAMA {n_panorama}")
-    subset_dict = get_common_specified_systems(padloc, dfinder, panorama, threshold)
+    subset_dict = get_common_specified_systems(padloc, dfinder, panorama)
 
     # Create a figure and axis for the Venn diagram
-    fig, ax = plt.subplots(figsize=(20, 11.25))
+    _, _ = plt.subplots(figsize=(20, 11.25))
 
     # Generate the Venn diagram
     venn = venn3(subsets=subset_dict, set_labels=(f'PADLOC ({n_padloc})', f'DefenseFinder ({n_df})',
@@ -171,55 +168,57 @@ def _build_similarity_graph(set1: Set[FrozenSet[str]], set2: Set[FrozenSet[str]]
     Returns:
         nx.Graph: A networkx graph with nodes connected based on similarity.
     """
-    G = nx.Graph()
+    graph = nx.Graph()
 
     # Add nodes
     for item in set1:
-        G.add_node((item, "set1"))  # Mark each node by its origin set
+        graph.add_node((item, "set1"))  # Mark each node by its origin set
     for item in set2:
-        G.add_node((item, "set2"))
+        graph.add_node((item, "set2"))
 
     # Add edges for similar elements
     for item1 in set1:
         for item2 in set2:
             if similar(item1, item2, threshold):
-                G.add_edge((item1, "set1"), (item2, "set2"))
+                graph.add_edge((item1, "set1"), (item2, "set2"))
 
-    return G
+    return graph
 
 
 def _compute_common_and_specific(set1: Set[FrozenSet[str]], set2: Set[FrozenSet[str]],
-                                 threshold: float) -> Tuple[int, int, int]:
+                                 threshold: float) -> Tuple[int, int, int, int]:
     """Analyze connected components of the graph to determine common and specific elements.
 
     Args:
         set1 (Set[FrozenSet[str]]): First set of frozensets to compare.
         set2 (Set[FrozenSet[str]]): Second set of frozensets to compare.
         threshold (float): Threshold for similarity.
-        err (str): Error message prefix for debugging.
 
     Returns:
         tuple: Counts of common groups and specific elements in set1 and set2.
     """
-    G = _build_similarity_graph(set1, set2, threshold)
-    components = list(nx.connected_components(G))
+    graph = _build_similarity_graph(set1, set2, threshold)
+    components = list(nx.connected_components(graph))
 
-    common_count = 0
+    common_set_1 = 0
+    common_set_2 = 0
     specific_count_set1 = 0
     specific_count_set2 = 0
 
     for component in components:
-        has_set1 = any(node[1] == "set1" for node in component)
-        has_set2 = any(node[1] == "set2" for node in component)
+        count_set1 = sum(node[1] == "set1" for node in component)
+        count_set2 = sum(node[1] == "set2" for node in component)
 
-        if has_set1 and has_set2:
-            common_count += 1  # Mixed group = common
-        elif has_set1:
-            specific_count_set1 += 1  # Group only in set1
-        elif has_set2:
-            specific_count_set2 += 1  # Group only in set2
+        if count_set1 > 0:
+            if count_set2 > 0:
+                common_set_1 += count_set1
+                common_set_2 += count_set2
+            else:
+                specific_count_set1 += count_set1  # Group only in set1
+        else:
+            specific_count_set2 += count_set2  # Group only in set2
 
-    return common_count, specific_count_set1, specific_count_set2
+    return common_set_1, common_set_2, specific_count_set1, specific_count_set2
 
 
 def count_system_similar(padloc: Dict[str, Set[FrozenSet[str]]],
@@ -243,9 +242,9 @@ def count_system_similar(padloc: Dict[str, Set[FrozenSet[str]]],
     nb_panorama_padloc = len(list(chain(*panorama_padloc.values())))
     nb_panorama_dfinder = len(list(chain(*panorama_dfinder.values())))
     comp_dict = {
-        "PADLOC & DFinder": {"Common": 0, "Specific PADLOC": 0, "Specific DFinder": 0},
-        "PADLOC & PANORAMA": {"Common": 0, "Specific PADLOC": 0, "Specific PANORAMA": 0},
-        "DFinder & PANORAMA": {"Common": 0, "Specific DFinder": 0, "Specific PANORAMA": 0}
+        "PADLOC & DFinder": defaultdict(float),
+        "PADLOC & PANORAMA": defaultdict(float),
+        "DFinder & PANORAMA": defaultdict(float),
     }
 
     for sys_type in sys_type_set:
@@ -255,31 +254,47 @@ def count_system_similar(padloc: Dict[str, Set[FrozenSet[str]]],
         panorama_dfinder_systems = panorama_dfinder.get(sys_type, set())
 
         # Comparison PADLOC <-> DFinder
-        common, specific_padloc, specific_dfinder = _compute_common_and_specific(padloc_systems, dfinder_systems,
-                                                                                 threshold)
-        comp_dict["PADLOC & DFinder"]["Common"] += common
-        comp_dict["PADLOC & DFinder"]["Specific PADLOC"] += specific_padloc
-        comp_dict["PADLOC & DFinder"]["Specific DFinder"] += specific_dfinder
+        common_padloc, common_dfinder, specific_padloc, specific_dfinder = _compute_common_and_specific(padloc_systems,
+                                                                                                        dfinder_systems,
+                                                                                                        threshold)
+        comp_dict["PADLOC & DFinder"]["Common M1"] += common_padloc
+        comp_dict["PADLOC & DFinder"]["Common M2"] += common_dfinder
+        comp_dict["PADLOC & DFinder"]["Specific M1"] += specific_padloc
+        comp_dict["PADLOC & DFinder"]["Specific M2"] += specific_dfinder
 
         # Comparison PADLOC <-> PANORAMA
-        common, specific_padloc, specific_panorama = _compute_common_and_specific(padloc_systems,
-                                                                                  panorama_padloc_systems,
-                                                                                  threshold)
-        comp_dict["PADLOC & PANORAMA"]["Common"] += common
-        comp_dict["PADLOC & PANORAMA"]["Specific PADLOC"] += specific_padloc
-        comp_dict["PADLOC & PANORAMA"]["Specific PANORAMA"] += specific_panorama
-
+        common_padloc, common_panorama, specific_padloc, specific_panorama = _compute_common_and_specific(
+            padloc_systems,
+            panorama_padloc_systems,
+            threshold)
+        comp_dict["PADLOC & PANORAMA"]["Common M1"] += common_padloc
+        comp_dict["PADLOC & PANORAMA"]["Common M2"] += common_panorama
+        comp_dict["PADLOC & PANORAMA"]["Specific M1"] += specific_padloc
+        comp_dict["PADLOC & PANORAMA"]["Specific M2"] += specific_panorama
         # Comparison DFinder <-> PANORAMA
-        common, specific_dfinder, specific_panorama = _compute_common_and_specific(dfinder_systems,
-                                                                                   panorama_dfinder_systems,
-                                                                                   threshold)
-        comp_dict["DFinder & PANORAMA"]["Common"] += common
-        comp_dict["DFinder & PANORAMA"]["Specific DFinder"] += specific_dfinder
-        comp_dict["DFinder & PANORAMA"]["Specific PANORAMA"] += specific_panorama
+        common_dfinder, common_panorama, specific_dfinder, specific_panorama = _compute_common_and_specific(
+            dfinder_systems,
+            panorama_dfinder_systems,
+            threshold)
+        comp_dict["DFinder & PANORAMA"]["Common M1"] += common_dfinder
+        comp_dict["DFinder & PANORAMA"]["Common M2"] += common_panorama
+        comp_dict["DFinder & PANORAMA"]["Specific M1"] += specific_dfinder
+        comp_dict["DFinder & PANORAMA"]["Specific M2"] += specific_panorama
+
+    comp_dict["PADLOC & DFinder"]["% common"] = round((comp_dict["PADLOC & DFinder"]["Common M1"] +
+                                                       comp_dict["PADLOC & DFinder"]["Common M2"]) / (
+                                                              nb_padloc + nb_dfinder) * 100, 2)
+    comp_dict["PADLOC & PANORAMA"]["% common"] = round((comp_dict["PADLOC & PANORAMA"]["Common M1"] +
+                                                        comp_dict["PADLOC & PANORAMA"]["Common M2"]) / (
+                                                               nb_padloc + nb_panorama_padloc) * 100, 2)
+    comp_dict["DFinder & PANORAMA"]["% common"] = round((comp_dict["DFinder & PANORAMA"]["Common M1"] +
+                                                         comp_dict["DFinder & PANORAMA"]["Common M2"]) / (
+                                                                nb_dfinder + nb_panorama_dfinder) * 100, 2)
 
     res_df = pd.DataFrame.from_dict(comp_dict, orient="index")
     res_df.index = [f"PADLOC ({nb_padloc}) & DFinder ({nb_dfinder})",
                     f"PADLOC ({nb_padloc}) & PANORAMA ({nb_panorama_padloc})",
                     f"DFinder ({nb_dfinder}) & PANORAMA ({nb_panorama_dfinder})"]
-    res_df.to_csv(output / "prediction_comparison.csv", index=True)
+    res_df = res_df[["Common M1", "Common M2", "% common", "Specific M1", "Specific M2"]]
+    res_df.to_csv(output / "prediction_comparison.tsv", index=True, sep="\t")
     print(res_df)

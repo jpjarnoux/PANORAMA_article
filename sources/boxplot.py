@@ -46,7 +46,7 @@ def gen_boxplot(count_df: pd.DataFrame, output: Path) -> Tuple[Set[str], Set[str
     count_melt = count_melt.dropna()
 
     # Create the boxplot
-    fig, ax = plt.subplots(
+    _, ax = plt.subplots(
         figsize=(20, 11.25),
         nrows=2,
         ncols=1,
@@ -65,7 +65,7 @@ def gen_boxplot(count_df: pd.DataFrame, output: Path) -> Tuple[Set[str], Set[str
     # Set x and y axis labels
     ax[0].set_xlabel('Systems type', fontsize=18)
 
-    ax[0].set_ylabel('Occurrences', fontsize=18)
+    ax[0].set_ylabel('')
 
     # Position the legend outside the plot
     ax[0].legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), fontsize='x-large')
