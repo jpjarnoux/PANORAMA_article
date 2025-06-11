@@ -225,7 +225,7 @@ def count_system_similar(padloc: Dict[str, Set[FrozenSet[str]]],
                          dfinder: Dict[str, Set[FrozenSet[str]]],
                          panorama_padloc: Dict[str, Set[FrozenSet[str]]],
                          panorama_dfinder: Dict[str, Set[FrozenSet[str]]],
-                         output: Path, threshold: float = 0.5) -> None:
+                         output: Path, threshold: float = 0.5) -> pd.DataFrame:
     """Count similar systems among different tools and save the results to a CSV file.
 
     Args:
@@ -297,4 +297,4 @@ def count_system_similar(padloc: Dict[str, Set[FrozenSet[str]]],
                     f"DFinder ({nb_dfinder}) & PANORAMA ({nb_panorama_dfinder})"]
     res_df = res_df[["Common M1", "Common M2", "% common", "Specific M1", "Specific M2"]]
     res_df.to_csv(output / "prediction_comparison.tsv", index=True, sep="\t")
-    print(res_df)
+    return res_df
