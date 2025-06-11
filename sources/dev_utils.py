@@ -62,7 +62,7 @@ padloc2dfinder = {'cbass_type_I': 'CBASS_I', 'cbass_type_II': 'CBASS_II', 'cbass
                   'gop_beta_cll': 'Rst_gop_beta_cll', 'Helicase-DUF2290': 'Rst_HelicaseDUF2290',
                   'Hydrolase-TM': 'Rst_Hydrolase-Tm', 'TIR-NLR': 'Rst_TIR-NLR',
 
-                  'gasdermin': 'GasderMIN', 'darTG': 'DarTG', 'Dynamins': 'Dynamins',
+                  'gasdermin': 'GasderMIN', 'darTG': 'DarTG',
 
                   'RM_type_I': 'RM_Type_I', 'RM_type_II': 'RM_Type_II', 'RM_type_IIG': 'RM_Type_IIG',
                   'RM_type_III': 'RM_Type_III', 'RM_type_IV': 'RM_Type_IV',

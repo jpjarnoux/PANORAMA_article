@@ -31,7 +31,7 @@ def load_system_data(results_path: Path) -> pd.DataFrame:
     for system_result in results_path.glob("*/dfinder/systems.tsv"):
         species_name = system_result.parent.parent.name
         curr_df = pd.read_csv(system_result, sep="\t")
-        group = curr_df.groupby("system name")["system number"].count().reset_index(names="count")
+        group = curr_df.groupby("system name")["system number"].count().reset_index(name="count")
         group["system type"] = group["system name"].map(type2category)
         group_type = group.groupby("system type")["count"].sum()
         df = pd.concat([df, group_type], axis=1, sort=True).fillna(0)
