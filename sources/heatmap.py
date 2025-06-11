@@ -46,6 +46,7 @@ def generate_heatmap(
         figsize: Tuple[float, float],
         cbar_label: str,
         base_fontsize: int = 24,
+        rotation: float = 0,
         **kwargs
 ) -> None:
     """
@@ -57,13 +58,14 @@ def generate_heatmap(
         figsize (Tuple[float, float]): Size of the figure.
         cbar_label (str): Label for the color bar.
         base_fontsize (int): Base font size for text elements.
+        rotation (float): Rotation angle in degrees for the annotation.
         **kwargs: Additional keyword arguments for seaborn heatmap.
     """
     plt.figure(figsize=figsize)
     sns.set_theme(font_scale=1.5)
 
     cbar_kws = {'shrink': 0.8}
-    ax = sns.heatmap(df.T, cbar_kws=cbar_kws, annot_kws={"rotation": 90, "fontsize": base_fontsize - 5}, **kwargs)
+    ax = sns.heatmap(df.T, cbar_kws=cbar_kws, annot_kws={"rotation": rotation, "fontsize": base_fontsize - 5}, **kwargs)
 
     plt.xlabel("Systems", fontsize=base_fontsize + 2)
     plt.xticks(fontsize=base_fontsize)
