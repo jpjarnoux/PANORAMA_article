@@ -25,9 +25,34 @@ PANORAMA is freely available and accessible through:
 
 ## Dependencies
 
+All the dependencies has been listed in the conda-env.yml file
+
 ## Dataset
 
+<!-- This part must be done when the repository with the data will be created-->
+
 ## Running the project
+
+To begin, note that you need to install Conda, follow the installation guide [here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
+
+To execute the notebook, you will need to first install some packages.
+
+These are listed in the following conda environment file conda-env.yml.
+
+The in development version of PPanGGOLiN is required to satisfy some feature and pangenome compatibility.
+
+To install the conda environment in the jupyter kernel, please copy and paste the following code in your terminal:
+
+```shell
+git clone https://github.com/labgem/PANORAMA_article
+conda update -n base -c defaults conda -y
+conda env create --file conda-env.yml
+conda init bash
+conda activate panorama_notebook
+python -m ipykernel install --user --name=panorama_notebook
+jupyter notebook --notebook-dir=./PANORAMA_article
+```
+
 
 ## References
 1. Gautreau, Guillaume, Adelme Bazin, Mathieu Gachet, Rémi Planel, Laura Burlot, Mathieu Dubois, Amandine Perrin, *et al.* « PPanGGOLiN: Depicting Microbial Diversity via a Partitioned Pangenome Graph ». PLOS Computational Biology 16, nᵒ 3 (19 mars 2020): e1007732. https://doi.org/10.1371/journal.pcbi.1007732.
