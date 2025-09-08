@@ -245,39 +245,38 @@ def get_panorama_results(panorama_dir: Path, position: int = 0, key: str = "",
 
                 for system_id in sorted(panorama_res[panorama_res["system name"] == system]["system number"].unique(),
                                         key=lambda x: len(x.split(', ')), reverse=True):
-                    sys_id = system_id.split(', ')
-                    if not set(sys_id).issubset(seen_id):
-                        regex_sys_id = r'\b' + r'\b|\b'.join(sys_id) + r'\b'
-                        seen_id.update(sys_id)
-                        sys_df = panorama_res[panorama_res["system number"].str.contains(rf'{regex_sys_id}', na=False)]
-                        system_family = set()
-                        partitions = []
-                        systems2count[system_name] = 1 if system_name not in systems2count else systems2count[
-                                                                                                    system_name] + 1
+                    if system_id not in seen_id:
+                        seen_id.add(system_id)
+                        sys_df = panorama_res[panorama_res["system number"] == system_id]
+                        if not sys_df[sys_df["annotation"].notna()].empty:
+                            system_family = set()
+                            partitions = []
+                            systems2count[system_name] = 1 if system_name not in systems2count else systems2count[
+                                                                                                        system_name] + 1
 
-                        for subsystem_id in sys_df["subsystem number"].unique():
-                            subsys_df = sys_df[sys_df["subsystem number"] == subsystem_id]
-                            for family, annotation, partition in zip(subsys_df["gene family"], subsys_df["annotation"],
-                                                                     subsys_df["partition"]):
-                                if not pd.isna(annotation):
-                                    system_family.add(str(family))
-                                    partitions.append(partition)
-                                    if family in fam2annot:
-                                        fam2annot[family].add(annotation)
-                                    else:
-                                        fam2annot[family] = {annotation}
+                            for subsystem_id in sys_df["subsystem number"].unique():
+                                subsys_df = sys_df[sys_df["subsystem number"] == subsystem_id]
+                                for family, annotation, partition in zip(subsys_df["gene family"], subsys_df["annotation"],
+                                                                         subsys_df["partition"]):
+                                    if not pd.isna(annotation):
+                                        system_family.add(str(family))
+                                        partitions.append(partition)
+                                        if family in fam2annot:
+                                            fam2annot[family].add(annotation)
+                                        else:
+                                            fam2annot[family] = {annotation}
 
-                        voted_part = vote_partitions(partitions)
-                        if system_name in systems2partitions:
-                            systems2partitions[system_name].append(voted_part)
-                        else:
-                            systems2partitions[system_name] = [voted_part]
+                            voted_part = vote_partitions(partitions)
+                            if system_name in systems2partitions:
+                                systems2partitions[system_name].append(voted_part)
+                            else:
+                                systems2partitions[system_name] = [voted_part]
 
-                        if system_name in name2systems:
-                            name2systems[system_name].append(system_family)
-                        else:
-                            name2systems[system_name] = [system_family]
-                        org2system[genome][system_name].append(system_family)
+                            if system_name in name2systems:
+                                name2systems[system_name].append(system_family)
+                            else:
+                                name2systems[system_name] = [system_family]
+                            org2system[genome][system_name].append(system_family)
 
     return org2system, systems2count, systems2partitions, name2systems, fam2annot
 

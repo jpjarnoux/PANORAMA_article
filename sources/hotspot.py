@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # from matplotlib.patches import Rectangle
 from tqdm import tqdm
 
-from sources.dev_utils import type2category as subtype2type
+from sources.dev_utils import type2category
 
 
 def parse_systems(sub_data: pd.DataFrame) -> pd.DataFrame:
@@ -25,7 +25,7 @@ def parse_systems(sub_data: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing filtered combinations of gene families.
     """
 
-    def get_fam_comb(sub_df: pd.DataFrame) -> set:
+    def get_fam_comb(df: pd.DataFrame) -> set:
         """Get unique gene family combinations for a subset of data.
 
         Args:
@@ -34,36 +34,59 @@ def parse_systems(sub_data: pd.DataFrame) -> pd.DataFrame:
         Returns:
             set: Unique gene family combinations.
         """
-        return set(sub_df["gene family"].unique())
+        return set(df["gene family"].unique())
+
+    def get_overlapping_units(df: pd.DataFrame) -> Set[int]:
+        """Get overlapping units for a subset of data."""
+        # Get the first non-empty overlapping_units value
+        overlapping_units_series = df["overlapping_units"].dropna()
+
+        if overlapping_units_series.empty:
+            return set()
+
+        overlapping_units_str = overlapping_units_series.iloc[0]
+
+        if not overlapping_units_str:
+            return set()
+
+        return {int(item.split(':')[0]) for item in overlapping_units_str.split("|")}
 
     # Group by system number, name, and category to get combinations
     sub_df = sub_data.groupby(["system number", "system name", "category"])[list(sub_data.columns)].apply(
         get_fam_comb).reset_index()
-    sub_df.columns = ["ID", "name", "category", "combination"]
+
+    sys2overlapping_units = sub_data.groupby(["system number", "system name", "category"])[["overlapping_units"]].apply(
+        get_overlapping_units).reset_index()
+
+    sub_df = sub_df.merge(sys2overlapping_units, on=["system number", "system name", "category"])
+    sub_df.columns = ["ID", "name", "category", "combination", "overlapping_units"]
 
     # Sort combinations by size in descending order
     combs_list = sorted(sub_df["combination"].tolist(), key=len, reverse=True)
 
     # Filter combinations to retain maximal sets
-    filtered_combs = defaultdict(lambda: {"id": set(), "names": set(), "categories": set()})
+    filtered_combs = defaultdict(lambda: {"id": set(), "names": set(), "categories": set(), "overlapping_units": set()})
 
     for comb in combs_list:
         systems_df = sub_df[sub_df["combination"] == comb]
         ids = set(itertools.chain(*systems_df["ID"].str.split(", ").tolist()))
         names = set(systems_df["name"].tolist())
         categories = set(systems_df["category"].tolist())
+        overlapping_units = set(itertools.chain(*systems_df["overlapping_units"].tolist()))
 
         # Find the largest combination that contains the current combination
         largest_comb = frozenset(sorted(comb))
         for larger in filtered_combs:
             if comb.issubset(larger):
                 largest_comb = larger
+                # a = filtered_combs[larger]
                 break
 
         # Update the filtered combinations
         filtered_combs[largest_comb]["id"] |= ids
         filtered_combs[largest_comb]["names"] |= names
         filtered_combs[largest_comb]["categories"] |= categories
+        filtered_combs[largest_comb]["overlapping_units"] |= overlapping_units
 
     return pd.DataFrame.from_dict(filtered_combs, orient="index")
 
@@ -78,12 +101,14 @@ def read_projection(file: Path) -> pd.DataFrame:
         pd.DataFrame: Processed DataFrame grouped by spots.
     """
     proj_df = pd.read_csv(file, sep="\t", header=0,
-                          usecols=["system number", "system name", "gene family", "annotation", "spots"],
+                          usecols=["system number", "system name", "gene family", "annotation", "spots",
+                                   "overlapping_units"],
                           dtype={0: str})
 
-    proj_df["category"] = proj_df["system name"].map(subtype2type)
+    proj_df["category"] = proj_df["system name"].map(type2category)
     return proj_df.groupby("spots")[
-        ['system number', 'system name', 'gene family', 'annotation', 'spots', 'category']].apply(parse_systems)
+        ['system number', 'system name', 'gene family', 'annotation', 'spots', 'category', "overlapping_units"]].apply(
+        parse_systems)
 
 
 def get_data_projection(projection: Path) -> pd.DataFrame:
@@ -149,8 +174,9 @@ def parse_data_scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], 
         nb_spot_org = len(spot2orgs[spot_id])
         frequency = nb_spot_org / nb_genomes
         defense_spot_frequency = len(sub_df["spot_sys_organisms"].unique().tolist()) / nb_genomes
-        nb_systems_org = len(sub_df["combinations"].tolist())
-        nb_systems_pan = len(set(itertools.chain(*sub_df["id"])))
+        overlapping_units = len(set(itertools.chain(*sub_df["overlapping_units"])))
+        nb_systems_org = len(sub_df["combinations"].tolist()) + overlapping_units
+        nb_systems_pan = len(set(itertools.chain(*sub_df["id"]))) + overlapping_units
         diversity = len(set(itertools.chain(*sub_df["categories"])))
         return pd.Series([nb_spot_org, frequency, defense_spot_frequency, nb_systems_org, nb_systems_pan, diversity],
                          index=["nb spot genomes", "spot frequency", "defense spot frequency", "nb systems genomes",
