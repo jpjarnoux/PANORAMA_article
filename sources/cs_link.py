@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-from pathlib import Path
-from typing import Dict, List, Tuple
 import itertools
+from pathlib import Path
+from typing import Dict, Tuple
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 
 from sources.dev_utils import type2category
@@ -29,37 +29,37 @@ def parse_data(data: pd.DataFrame, systems: Dict[str, pd.DataFrame]) -> pd.DataF
 
     def grouped_row(sub_df: pd.DataFrame) -> pd.Series:
         """
-		Process a group of rows to extract system, pangenome, and spot information.
+        Process a group of rows to extract system, pangenome, and spot information.
 
-		Args:
-			sub_df (pd.DataFrame): Subset of the DataFrame to process.
+        Args:
+            sub_df (pd.DataFrame): Subset of the DataFrame to process.
 
-		Returns:
-			pd.Series: Series containing processed data for a group.
-		"""
+        Returns:
+            pd.Series: Series containing processed data for a group.
+        """
         spot_id = int(sub_df.spots.unique()[0].replace('spot_', ""))
         systems_list = sub_df["system name"].tolist()
         sys_id_list = sub_df["system number"].tolist()
-        return pd.Series([spot_id, sys_id_list, systems_list], index=["Spot ID", "sys_id", "systems"])
+        return pd.Series([spot_id, sys_id_list, systems_list], index=["Spot_ID", "sys_id", "systems"])
 
     def grouped_cs(sub_df: pd.DataFrame) -> pd.Series:
         """
-		Process a group of rows to extract spot and system information for conserved systems.
+        Process a group of rows to extract spot and system information for conserved systems.
 
-		Args:
-			sub_df (pd.DataFrame): Subset of the DataFrame to process.
+        Args:
+            sub_df (pd.DataFrame): Subset of the DataFrame to process.
 
-		Returns:
-			pd.Series: Series containing processed spot and system data for conserved systems.
-		"""
-        spot_list = sub_df["Spot ID"].tolist()
+        Returns:
+            pd.Series: Series containing processed spot and system data for conserved systems.
+        """
+        spot_list = sub_df["Spot_ID"].tolist()
         pan_list = sub_df["Pangenome"].tolist()
         sys_id_lists = sub_df["sys_id"].apply(lambda x: x if isinstance(x, list) else []).tolist()
         systems_id_list = list(itertools.chain(*sys_id_lists))
         sys_lists = sub_df["systems"].apply(lambda x: x if isinstance(x, list) else []).tolist()
         systems_list = list(itertools.chain(*sys_lists))
         return pd.Series([spot_list, pan_list, systems_id_list, systems_list],
-                         index=["Spot ID", "Pangenome", "systems_id", "systems"])
+                         index=["Spot_ID", "Pangenome", "systems_id", "systems"])
 
     spots2systems_list = []
     for species, system_df in systems.items():
@@ -67,17 +67,17 @@ def parse_data(data: pd.DataFrame, systems: Dict[str, pd.DataFrame]) -> pd.DataF
         system_df = system_df.explode("spots")
         spots_df = system_df.groupby("spots").apply(grouped_row).reset_index(drop=True)
         spots_df["Pangenome"] = species
-        spots_df = spots_df.set_index(["Spot ID", "Pangenome"])
+        spots_df = spots_df.set_index(["Spot_ID", "Pangenome"])
         spots2systems_list.append(spots_df)
 
     spots2systems = pd.concat(spots2systems_list, axis="index")
-    data = data.set_index(["Spot ID", "Pangenome"])
+    data = data.set_index(["Spot_ID", "Pangenome"])
     cs2systems = data.join(spots2systems, how="left").reset_index()
     cs2systems_group = (
-        cs2systems.groupby(["Conserved ID"])
+        cs2systems.groupby(["Conserved_Spot_ID"])
         .apply(grouped_cs)
         .reset_index()
-        .set_index(["Conserved ID"], drop=True)
+        .set_index(["Conserved_Spot_ID"], drop=True)
     )
     return cs2systems_group
 
@@ -164,29 +164,29 @@ def generate_tile_plot_visualization(data: pd.DataFrame, output: Path, base_font
     data_exp = data.explode('systems')
     data_exp["category"] = data_exp['systems'].map(type2category)
     result = (
-        data_exp.groupby(['Conserved ID', 'category'])
+        data_exp.groupby(['Conserved_Spot_ID', 'category'])
         .size()
         .reset_index(name='count')
     )
     result = (
-        result.groupby(['Conserved ID'])
+        result.groupby(['Conserved_Spot_ID'])
         .apply(calculate_percentage)
         .reset_index()
         .drop('level_2', axis=1)
     )
 
     heatmap_data = (
-        result.pivot(index='Conserved ID', columns='category', values='count')
+        result.pivot(index='Conserved_Spot_ID', columns='category', values='count')
         .fillna(0)
     )
 
     pangenome_combinations = (
-        data.groupby("Conserved ID")
+        data.groupby("Conserved_Spot_ID")
         .apply(get_pangenome_matrix)
     )
     pangenome_combinations.name = "combination"
     pangenome_combinations = pangenome_combinations.reset_index()
-    grouped_ids = pangenome_combinations.groupby(by="combination")["Conserved ID"].apply(list)
+    grouped_ids = pangenome_combinations.groupby(by="combination")["Conserved_Spot_ID"].apply(list)
 
     sorted_groups = grouped_ids.reindex(
         sorted(grouped_ids.index, key=lambda d: (len(d), d), reverse=True)

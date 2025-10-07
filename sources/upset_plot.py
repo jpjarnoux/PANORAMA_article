@@ -1,160 +1,155 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-from collections import defaultdict
-from pathlib import Path
-from typing import Dict, List, Tuple
-import pandas as pd
+from typing import Dict, List
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from upsetplot import UpSet
 
-from sources.dev_utils import type2category
 
-
-def parse_data(data: pd.DataFrame, systems: Dict[str, pd.DataFrame]) -> Tuple[pd.DataFrame, List[str]]:
+def parse_data(cs_data: pd.DataFrame, systems: Dict[str, pd.DataFrame],
+               total_spots: Dict[str, int] = None) -> pd.DataFrame:
     """
-    Parse and merge data from DataFrames containing system and spot information.
+       Parse and merge data from DataFrames containing system and spot information.
 
-    This function processes the input data to extract and merge information about systems,
-    pangenomes, and spots, returning a DataFrame with the parsed data.
+       This function processes the input data to extract and merge information about systems,
+       pangenomes, and spots, returning a DataFrame with the parsed data.
 
-    Args:
-        data (pd.DataFrame): DataFrame containing conserved spot data.
-        systems (Dict[str, pd.DataFrame]): Dictionary of DataFrames containing system data for each species.
+       Args:
+           cs_data (pd.DataFrame): DataFrame containing conserved spot data.
+           systems (Dict[str, pd.DataFrame]): Dictionary of DataFrames containing system data for each species.
+           total_spots (Dict[str, int]): Dictionary of total number of spots for each species.
 
-    Returns:
-        Tuple[pd.DataFrame, List[str]]: A DataFrame with parsed data and a list of pangenomes.
+       Returns:
+           Tuple[pd.DataFrame, List[str]]: A DataFrame with parsed data and a list of pangenomes.
     """
+    pangenome_list = systems.keys()
+    # Step 1: Prepare system data for each pangenome
+    # We need: which systems are associated with which spots
+    pangenome_spot_to_systems = {}  # {pangenome: {spot: set(system_numbers)}}
 
-    def grouped_row(sub_df: pd.DataFrame) -> pd.Series:
-        """
-        Process a group of rows to extract system, pangenome, and spot information.
+    for pangenome, sys_df in systems.items():
+        sys_df = sys_df.copy()
+        sys_df['spots'] = sys_df['spots'].fillna('')
 
-        Args:
-            sub_df (pd.DataFrame): Subset of the DataFrame to process.
+        spot_to_systems = {}
+        for _, row in sys_df.iterrows():
+            system_number = row['system number']
+            if row['spots']:
+                spots = [s.strip() for s in row['spots'].split(',')]
+                for spot in spots:
+                    if spot not in spot_to_systems:
+                        spot_to_systems[spot] = set()
+                    spot_to_systems[spot].add(system_number)
 
-        Returns:
-            pd.Series: Series containing processed data for a group.
-        """
-        sys = sub_df["systems_name"].str.split(',').explode().tolist()
-        pangenomes = sub_df["Pangenome"].tolist()
-        spots = sub_df["Spot ID"].tolist()
-        return pd.Series(
-            [sys, pangenomes, spots] + [p in pangenomes for p in pangenomes_list],
-            index=["system", "pangenome", "spot"] + pangenomes_list
-        )
+        pangenome_spot_to_systems[pangenome] = spot_to_systems
 
-    # Identify all spots associated with a system in the systems dictionary
-    spots2systems_list = []
-    for species, system_df in systems.items():
-        system_df["Pangenome"] = species
-        spots2systems_list.append(system_df)
+    # Step 2: Track which spots are in conserved groups
+    conserved_spots = {}  # {pangenome: set of spot_ids}
+    for pg in pangenome_list:
+        conserved_spots[pg] = set()
 
-    spots2systems_df = pd.concat(spots2systems_list, ignore_index=True)
-    spots2systems_df["Spot ID"] = spots2systems_df["name"].str.replace("spot_", "").apply(int)
+    for _, row in cs_data.iterrows():
+        pg = row['Pangenome']
+        spot_id = row['Spot_ID']
+        if pg in conserved_spots:
+            conserved_spots[pg].add(spot_id)
 
-    joined_df = pd.merge(left=data, right=spots2systems_df, on=["Pangenome", "Spot ID"],
-                         how="inner", validate="one_to_one")
-    joined_df = joined_df.drop(columns=["name", "systems_ID"])
-    pangenomes_list = joined_df['Pangenome'].unique().tolist()
-    grouped_df = joined_df.groupby(["Conserved ID"]).apply(grouped_row)
-    exploded_df = grouped_df.explode('system').reset_index()
-    exploded_df["system_type"] = exploded_df["system"].map(type2category)
-    return exploded_df, pangenomes_list
+    # Step 3: Process conserved spots (grouped)
+    result_rows = []
 
+    for conserved_id, group in cs_data.groupby('Conserved_Spot_ID'):
+        # Get pangenomes and spots in this conserved group
+        pangenomes = group['Pangenome'].tolist()
+        spots = group['Spot_ID'].tolist()
 
-def generate_upset_plot_spots(
-        cs_spots: pd.DataFrame,
-        nb_spots: Dict[str, int],
-        systems_data: Dict[str, pd.DataFrame],
-        output: Path,
-        base_font_size: int = 12
-) -> None:
-    """
-    Generate and save an UpSet plot visualizing spot intersections across pangenomes.
+        # For each pangenome in the list, check presence
+        pangenome_presence = {pg: (pg in pangenomes) for pg in pangenome_list}
 
-    This function creates an UpSet plot to visualize the intersections of spots across different
-    pangenomes, highlighting the presence of systems and their counts.
-
-    Args:
-        cs_spots (pd.DataFrame): DataFrame containing conserved spot data.
-        nb_spots (Dict[str, int]): Dictionary of the number of spots per pangenome.
-        systems_data (Dict[str, pd.DataFrame]): Dictionary of system data for each pangenome.
-        output (Path): Path to save the output plot.
-        base_font_size (int): Base font size for the plot.
-
-    Returns:
-        None
-    """
-
-    def grouped_row(sub_df: pd.DataFrame) -> pd.Series:
-        """
-        Process a group of rows to extract intersection and system information.
-
-        Args:
-            sub_df (pd.DataFrame): Subset of the DataFrame to process.
-
-        Returns:
-            pd.Series: Series containing processed intersection and system data for a group.
-        """
-        pangenomes = sub_df["Pangenome"].tolist()
-        intersection = frozenset(pangenomes)
-        spots = sub_df["Spot ID"].tolist()
+        # Collect all unique systems across all spots in this conserved group
+        all_systems = set()
         with_systems = []
         nb_systems = []
-        for p, spot in zip(pangenomes, spots):
-            spot2sys_df = systems_data[p]
-            spot2sys_df = spot2sys_df.set_index("name")
-            if f"spot_{spot}" in spot2sys_df.index.values:
-                with_systems.append(True)
-                shared_systems = spot2sys_df.loc[f"spot_{spot}"]["systems_ID"].split(",")
-                inter2sys[intersection][p] |= set(shared_systems)
-                nb_systems.append(len(shared_systems))
-                shared_pan_systems[p] |= set(shared_systems)
-            else:
-                with_systems.append(False)
-                nb_systems.append(0)
 
-        cs_with_systems = any(with_systems)
-        cs_nb_systems = sum(nb_systems)
-        return pd.Series(
-            [cs_with_systems, cs_nb_systems, pangenomes, spots, with_systems, nb_systems] +
-            [p in pangenomes for p in pangenomes_list],
-            index=["cs_with_systems", "cs_nb_sys", "pangenome", "spot", "with_systems", "nb_systems"] + pangenomes_list
-        )
+        for i, (pg, spot) in enumerate(zip(pangenomes, spots, strict=False)):
+            spot_str = f"spot_{spot}"
+            systems_set = pangenome_spot_to_systems.get(pg, {}).get(spot_str, set())
+            nb_sys = len(systems_set)
+            nb_systems.append(nb_sys)
+            with_systems.append(nb_sys > 0)
+            all_systems.update(systems_set)  # Add to global set
 
-    count_spot = cs_spots.groupby('Pangenome')["Spot ID"].count()
-    pangenomes_list = list(nb_spots.keys())
-    inter2sys = defaultdict(lambda: defaultdict(set))
-    shared_pan_systems = {p: set() for p in pangenomes_list}
-    all_pan_systems = {
-        p: set(systems_data[p]["systems_ID"].str.split(",").explode().unique())
-        for p in pangenomes_list
-    }
+        # Calculate summary stats
+        cs_nb_sys = len(all_systems)  # Unique systems across all spots
+        cs_with_systems = cs_nb_sys > 0
+        nb_spot = len(spots)
+        nb_with_sys = sum(with_systems)
 
-    binary_df = (
-        cs_spots.groupby("Conserved ID")
-        .apply(grouped_row)
-        .reset_index()
-        .set_index(pangenomes_list + ["Conserved ID"])
-    )
+        # Build row dict with dynamic pangenome columns
+        row = {}
+        for pg in pangenome_list:
+            row[pg] = pangenome_presence[pg]
 
-    alone_df = pd.DataFrame(
-        [
-            [p == pangenome for p in pangenomes_list] +
-            [pd.NA, True, len(all_pan_systems[pangenome]) - len(shared_pan_systems[pangenome]), [pangenome],
-             pd.NA, pd.NA, pd.NA, nb_spot - count_spot[pangenome], pd.NA]
-            for pangenome, nb_spot in nb_spots.items()
-        ],
-        columns=pangenomes_list + ["Conserved ID"] + binary_df.columns.tolist() + ["nb_spot", "nb_with_sys"]
-    ).set_index(pangenomes_list + ["Conserved ID"])
+        row.update({
+            'Conserved ID': float(conserved_id),
+            'cs_with_systems': cs_with_systems,
+            'cs_nb_sys': cs_nb_sys,
+            'pangenome': pangenomes,
+            'spot': spots,
+            'with_systems': with_systems,
+            'nb_systems': nb_systems,
+            'nb_spot': nb_spot,
+            'nb_with_sys': nb_with_sys
+        })
 
-    binary_df["nb_spot"] = binary_df["spot"].apply(len)
-    binary_df["nb_with_sys"] = binary_df["with_systems"].apply(lambda x: sum(x))
-    binary_df = pd.concat([binary_df, alone_df], axis="index").reset_index().set_index(pangenomes_list)
+        result_rows.append(row)
 
-    binary_df.to_csv(output / "upset_data.tsv", sep="\t", index=True)
+    # Step 4: Add non-conserved spots for each pangenome
+    for pg in pangenome_list:
+        # Get all spots for this pangenome (0 to total_spots[pg] - 1)
+        all_spots = set(range(total_spots[pg]))
 
+        # Get non-conserved spots
+        non_conserved = all_spots - conserved_spots[pg]
+
+        if len(non_conserved) > 0:
+            # Collect all unique systems for non-conserved spots
+            all_systems = set()
+            nb_with_sys = 0
+
+            for spot_id in non_conserved:
+                spot_str = f"spot_{spot_id}"
+                systems_set = pangenome_spot_to_systems.get(pg, {}).get(spot_str, set())
+                all_systems.update(systems_set)
+                if len(systems_set) > 0:
+                    nb_with_sys += 1
+
+            # Build row for non-conserved spots
+            row = {}
+            for pg_col in pangenome_list:
+                row[pg_col] = (pg_col == pg)
+
+            row.update({
+                'Conserved ID': np.nan,
+                'cs_with_systems': len(all_systems) > 0,
+                'cs_nb_sys': len(all_systems),  # Unique systems
+                'pangenome': [pg],
+                'spot': None,
+                'with_systems': None,
+                'nb_systems': None,
+                'nb_spot': len(non_conserved),
+                'nb_with_sys': nb_with_sys
+            })
+
+            result_rows.append(row)
+
+    result_df = pd.DataFrame(result_rows)
+    return result_df
+
+def generate_upset_plot_spots(data: pd.DataFrame, pangenome_list: List[str], output, base_font_size: int = 12):
+    binary_df = data.set_index(pangenome_list)
     upset = UpSet(
         binary_df,
         intersection_plot_elements=0,
