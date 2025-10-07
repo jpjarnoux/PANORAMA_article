@@ -2,20 +2,22 @@
 # coding:utf-8
 
 # default libraries
-from pathlib import Path
-from typing import Dict, List, Set, Tuple
+import ast
 import json
 from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Set, Tuple
+
+import colorcet as cc
+import matplotlib.pyplot as plt
 
 # installed libraries
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import seaborn as sns
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import ConnectionPatch
-import seaborn as sns
 from scipy.stats import entropy
-import colorcet as cc
 
 # local libraries
 from sources.dev_utils import type2category
@@ -70,7 +72,7 @@ def shannon_normalized(data: pd.DataFrame, min_required: Dict[str, int], nb_grou
 
     shannon = {"system type": [], "entropy": []}
     for k, values in type2shannon.items():
-        entropies, weights = zip(*values)
+        entropies, weights = zip(*values, strict=False)
         weighted_entropy = np.average(entropies, weights=weights)
         shannon["system type"].append(k)
         shannon["entropy"].append(weighted_entropy)
@@ -87,7 +89,7 @@ def shannon_normalized(data: pd.DataFrame, min_required: Dict[str, int], nb_grou
         if k not in top_types:
             concat_o += v
 
-    o_entropy, o_weight = zip(*concat_o)
+    o_entropy, o_weight = zip(*concat_o, strict=False)
     o_weighted_entropy = np.average(o_entropy, weights=o_weight)
     shannon_top["system type"].append("Other")
     shannon_top["entropy"].append(o_weighted_entropy)
@@ -259,7 +261,7 @@ def create_color_map(system_types: Set[str]) -> Dict[str, str]:
 
     # Create the color map by mapping system types to palette colors
     sorted_types = sorted(system_types)
-    color_map = dict(zip(sorted_types, palette))
+    color_map = dict(zip(sorted_types, palette, strict=False))
 
     return color_map
 
@@ -309,7 +311,7 @@ def spot_occurrence(data: pd.DataFrame, output: Path, field: str = "system name"
 
     # Get top types
     type_grouped_spot_counts = spot_grouped_type_counts.T.sum(axis=1)
-    top_types = type_grouped_spot_counts.nlargest(nb_top).index.tolist()
+    top_types = type_grouped_spot_counts.nlargest(nb_top-1).index.tolist()
 
     # Group non-top types into "Other"
     non_top = [col for col in spot_grouped_type_counts.columns if col not in top_types]
@@ -347,7 +349,7 @@ def plot_spot_occurrence(spot_data: pd.DataFrame, color_map: Dict, nb_color_lege
     ax.tick_params(axis='y', labelsize=base_fontsize)
 
     # Customize the legend with larger font size
-    ax.legend(title="System types", fontsize=base_fontsize + 2, title_fontsize=base_fontsize + 4,
+    ax.legend(title="System Category", fontsize=base_fontsize + 2, title_fontsize=base_fontsize + 4,
               loc='upper right', ncol=nb_color_legend)
 
     # Adjust layout to prevent overlap
@@ -474,13 +476,71 @@ def plot_pie_charts(top_spots: list, spot_type_counts: pd.DataFrame, color_map: 
     plt.tight_layout()
 
 
-def plot_spots_and_pies(data: pd.DataFrame, field: str = "type_grouped", nb_cols: int = 50,
-                        nb_spots: int = 5, output: Path = None, figsize: Tuple[int, int] = (40, 20)) -> None:
+def parse_data(projection_df: pd.DataFrame, systems_df: pd.DataFrame) -> pd.DataFrame:
+    # Function to parse set/frozenset strings
+    def parse_set_string(s):
+        """Convert string representation of set to actual set"""
+        if pd.isna(s) or s == 'set()':
+            return set()
+        # Remove 'set(' and ')' or 'frozenset(' and ')'
+        s = str(s).replace('frozenset(', '').replace('set(', '').strip(')')
+        if s == '' or s == 'set()':
+            return set()
+        try:
+            return ast.literal_eval(s)
+        except Exception:
+            return set()
+
+    # Create list to store expanded rows
+    expanded_rows = []
+
+    # Iterate through each row
+    for _, row in projection_df.iterrows():
+        spot = row.name
+        organism = row['spot_sys_organisms']
+
+        # Parse systems and overlapping_systems
+        systems = parse_set_string(row['id'])
+        overlapping_systems = parse_set_string(row['overlapping_units'])
+
+        # Combine all systems (both regular and overlapping)
+        all_systems = systems.union(overlapping_systems)
+
+        # Create a row for each system
+        for system in all_systems:
+            expanded_rows.append({
+                'system number': str(system),
+                'spots': spot,
+                'organism': organism
+            })
+
+    # Create the intermediate dataframe
+    df_expanded = pd.DataFrame(expanded_rows)
+
+    # Group by system number only, concatenate both spots and organisms with ', '
+    result_df = df_expanded.groupby(['system number'], as_index=False).agg({
+        'spots': lambda x: ', '.join(sorted(set(x))),
+        'organism': lambda x: ', '.join(sorted(set(x)))
+    })
+
+    # Sort by system number (convert to int for proper numerical sorting)
+    result_df['system number'] = result_df['system number'].astype(int)
+    result_df = result_df.sort_values('system number').reset_index(drop=True)
+    result_df['system number'] = result_df['system number'].astype(str)
+    systems_df["system number"] = systems_df["system number"].astype(str)
+    result_df = result_df.merge(systems_df[['system number', 'system name', 'system category',]], on='system number', how='left')
+    return result_df[['system number', 'system name', 'system category', 'spots', 'organism']]
+
+
+def plot_spots_and_pies(projection_data: pd.DataFrame, systems_data: pd.DataFrame, field: str = "type_grouped",
+                        nb_cols: int = 50, nb_spots: int = 5, output: Path = None,
+                        figsize: Tuple[int, int] = (40, 20)) -> None:
     """
     Generate a plot with occurrences in spots and pie charts for the top spots.
 
     Args:
-        data (pd.DataFrame): DataFrame containing the system data.
+        projection_data (pd.DataFrame): DataFrame containing the projection data.
+        systems_data (pd.DataFrame): DataFrame containing the system data.
         field (str): Column name for grouping systems.
         nb_cols (int): Number of spots to show in the spot occurrence plot.
         nb_spots (int): Number of top spots to generate pie charts for.
@@ -493,6 +553,7 @@ def plot_spots_and_pies(data: pd.DataFrame, field: str = "type_grouped", nb_cols
     nb_slice = 10
     nb_top_occ = 24
 
+    data = parse_data(projection_data, systems_data)
     # Get spot occurrences and top types
     spot_grouped_type_counts, top_types_occ = spot_occurrence(data, output, field=field, nb_cols=nb_cols,
                                                               nb_top=nb_top_occ, keep_other_spots=False)
@@ -541,4 +602,4 @@ def plot_spots_and_pies(data: pd.DataFrame, field: str = "type_grouped", nb_cols
         plt.savefig(output / "spots_and_pies.png", format='png', dpi=300)
         plt.savefig(output / "spots_and_pies.svg", format='svg')
 
-    plt.show()
+    # plt.show()

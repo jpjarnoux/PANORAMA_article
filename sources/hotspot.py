@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # coding:utf-8
 
-from pathlib import Path
+import itertools
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, Set
 
-import itertools
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+
 # from matplotlib.patches import Rectangle
 from tqdm import tqdm
 
@@ -121,7 +122,7 @@ def get_data_projection(projection: Path) -> pd.DataFrame:
         pd.DataFrame: Concatenated DataFrame of all projection files.
     """
     spot_df_list = []
-    for file in tqdm(list(projection.glob("*.tsv")), desc="Read projections"):
+    for file in tqdm(list(projection.glob("*.tsv")), desc="Read projections", position=1, unit="projection"):
         spot_df = read_projection(file)
         if not spot_df.empty:
             spot_df["spot_sys_organisms"] = file.stem
@@ -140,7 +141,7 @@ def get_spot2orgs(tables: Path) -> Dict[str, Set[str]]:
         Dict[str, Set[str]]: Dictionary mapping spots to sets of organisms.
     """
     spot2orgs = defaultdict(set)
-    for file in tqdm(list(tables.glob("*.tsv")), desc="Read tables"):
+    for file in tqdm(list(tables.glob("*.tsv")), desc="Read tables files", unit="table", position=1):
         org = file.stem
         table_df = pd.read_csv(file, sep="\t", header=0, usecols=["Spot"]).dropna(subset=["Spot"])
         for spot in table_df["Spot"].unique():
@@ -174,9 +175,11 @@ def parse_data_scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], 
         nb_spot_org = len(spot2orgs[spot_id])
         frequency = nb_spot_org / nb_genomes
         defense_spot_frequency = len(sub_df["spot_sys_organisms"].unique().tolist()) / nb_genomes
-        overlapping_units = len(set(itertools.chain(*sub_df["overlapping_units"])))
-        nb_systems_org = len(sub_df["combinations"].tolist()) + overlapping_units
-        nb_systems_pan = len(set(itertools.chain(*sub_df["id"]))) + overlapping_units
+        overlapping_units = set(itertools.chain(*sub_df["overlapping_units"]))
+        nb_overlapping_units = len(overlapping_units)
+        nb_systems_org = len(sub_df["combinations"].tolist()) + nb_overlapping_units
+        systems_pangenome = set(map(int, itertools.chain(*sub_df["id"]))) | overlapping_units
+        nb_systems_pan = len(systems_pangenome)
         diversity = len(set(itertools.chain(*sub_df["categories"])))
         return pd.Series([nb_spot_org, frequency, defense_spot_frequency, nb_systems_org, nb_systems_pan, diversity],
                          index=["nb spot genomes", "spot frequency", "defense spot frequency", "nb systems genomes",
@@ -238,7 +241,8 @@ def gen_scatter_plot(data: pd.DataFrame, x_field: str = "spot frequency", x_labe
     plt.show()
 
 
-def scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], nb_genomes: int, output: Path = Path(".")):
+def scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], nb_genomes: int, output: Path,
+                 file_name: str, min_freq: int = .25, min_sys: int = 60):
     """Generate and save scatter plots for the given data.
 
     Args:
@@ -248,6 +252,7 @@ def scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], nb_genomes:
         output (Path): Path to the directory where plots will be saved.
     """
     parsed_data = parse_data_scatter_plot(data, spot2orgs, nb_genomes)
-    parsed_data.to_csv(output / "scatter_hotspot.tsv", sep="\t", index=True)
-    gen_scatter_plot(parsed_data, x_field='defense spot frequency', x_label='Defense spot frequency', min_freq=.25,
-                     y_field="nb systems pangenome", file_name="defense_hotspot_systems_pangenome.png", output=output)
+    parsed_data.to_csv(output/f"{file_name}.tsv", sep="\t", index=True)
+    gen_scatter_plot(parsed_data, x_field='defense spot frequency', x_label='Defense spot frequency',
+                     min_freq=min_freq, min_y_for_text=min_sys, y_field="nb systems pangenome",
+                     file_name=f"{file_name}.png", output=output)

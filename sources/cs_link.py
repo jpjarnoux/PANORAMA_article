@@ -107,7 +107,7 @@ def generate_tile_plot(pivot: pd.DataFrame, output: Path, base_fontsize: int = 1
 
     ax.set_ylabel("Cluster", fontsize=base_fontsize + 2)
     ax.set_xlabel("System category", fontsize=base_fontsize + 2)
-    ax.tick_params(axis='y', labelsize=base_fontsize, rotation=40)
+    ax.tick_params(axis='y', labelsize=base_fontsize, rotation=0)
     ax.tick_params(axis='x', labelsize=base_fontsize)
 
     colorbar = ax.collections[0].colorbar
