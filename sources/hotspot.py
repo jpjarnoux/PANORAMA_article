@@ -9,7 +9,6 @@ from typing import Dict, Set
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# from matplotlib.patches import Rectangle
 from tqdm import tqdm
 
 from sources.dev_utils import type2category
@@ -242,7 +241,7 @@ def gen_scatter_plot(data: pd.DataFrame, x_field: str = "spot frequency", x_labe
 
 
 def scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], nb_genomes: int, output: Path,
-                 file_name: str, min_freq: int = .25, min_sys: int = 60):
+                 file_name: str, min_freq: float = .25, min_sys: int = 60):
     """Generate and save scatter plots for the given data.
 
     Args:
