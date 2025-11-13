@@ -2,31 +2,32 @@
 # coding:utf-8
 
 # default libraries
-from pathlib import Path
-from collections import defaultdict
-from typing import Dict, List, Set, Tuple, Optional, Any
-import re
 import csv
+import re
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # installed libraries
-from tqdm import tqdm
 import pandas as pd
+from tqdm import tqdm
 
 # local libraries
 from sources.dev_utils import padloc2dfinder, vote_partitions
 
 
-def load_gene_families(gene_families: str, return_dict: Dict[str, Any]) -> None:
+def load_gene_families(gene_families: str, return_dict: Dict[str, Any], disable_bar: bool = False) -> None:
     """Loads gene families from a file.
 
     Args:
         gene_families (str): Path to the gene families file.
         return_dict (Dict[str, Any]): Shared dictionary to store the results.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
     """
     gene2family = {}
     fam2size = defaultdict(lambda: 0)
     with open(gene_families, 'r') as file:
-        for row in tqdm(csv.reader(file, delimiter='\t')):
+        for row in tqdm(csv.reader(file, delimiter='\t'), disable=disable_bar, desc="Read gene families file"):
             gene2family[str(row[1])] = str(row[0])
             fam2size[str(row[0])] += 1
 
@@ -35,32 +36,34 @@ def load_gene_families(gene_families: str, return_dict: Dict[str, Any]) -> None:
     return_dict['fam2size'] = dict(fam2size)
 
 
-def load_locus_tags(locus2protID_file: Optional[str], return_dict: Dict[str, Any]) -> None:
+def load_locus_tags(locus2protid_file: Optional[str], return_dict: Dict[str, Any]) -> None:
     """Loads locus tags and protein IDs from a file.
 
     Args:
-        locus2protID_file (Optional[str]): Path to the locus2protID file, or None if not provided.
+        locus2protid_file (Optional[str]): Path to the locus2protid file, or None if not provided.
         return_dict (Dict[str, Any]): Shared dictionary to store the results.
     """
-    if locus2protID_file:
-        locus2protID_df = pd.read_csv(locus2protID_file, sep='\t', header=None, names=['PA', 'NP'])
-        locus2protID = locus2protID_df.set_index('NP')['PA'].to_dict()
-        return_dict['locus2protID'] = locus2protID
+    if locus2protid_file:
+        locus2protid_df = pd.read_csv(locus2protid_file, sep='\t', header=None, names=['PA', 'NP'])
+        locus2protid = locus2protid_df.set_index('NP')['PA'].to_dict()
+        return_dict['locus2protID'] = locus2protid
     else:
         return_dict['locus2protID'] = None
 
 
-def load_padloc_results(padloc_file: Path, gene2family: Dict[str, str], locus2protID: Optional[Dict[str, str]],
-                        return_dict: Dict[str, Any], position: int = 0) -> None:
+def load_padloc_results(padloc_file: Path, gene2family: Dict[str, str], locus2protid: Optional[Dict[str, str]],
+                        return_dict: Dict[str, Any], disable_bar: bool = False, position: int = 0) -> None:
     """Loads Padloc results.
 
     Args:
         padloc_file (str): Path to the Padloc results file.
         gene2family (Dict[str, str]): Gene-to-family mapping.
-        locus2protID (Optional[Dict[str, str]]): Locus-to-protein ID mapping.
+        locus2protid (Optional[Dict[str, str]]): Locus-to-protein ID mapping.
         return_dict (Dict[str, Any]): Shared dictionary to store the results.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
     """
-    padloc_res, count, fam_annot = get_padloc_results(padloc_file, gene2family, locus2protID, position)
+    padloc_res, count, fam_annot = get_padloc_results(padloc_file, gene2family, locus2protid, disable_bar, position)
 
     # Storing the Padloc results in the shared dictionary
     return_dict['padloc_res'] = padloc_res
@@ -68,16 +71,19 @@ def load_padloc_results(padloc_file: Path, gene2family: Dict[str, str], locus2pr
     return_dict['padloc_fam_annot'] = fam_annot
 
 
-def load_panorama_results(panorama_file: Path, return_dict: Dict[str, Any], key_prefix: str, position: int = 0) -> None:
+def load_panorama_results(panorama_file: Path, return_dict: Dict[str, Any], key_prefix: str,
+                          disable_bar: bool = False, position: int = 0) -> None:
     """Loads Panorama results.
 
     Args:
         panorama_file (str): Path to the Panorama results file.
         return_dict (Dict[str, Any]): Shared dictionary to store the results.
         key_prefix (str): Prefix for keys in the shared dictionary to differentiate between results.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
     """
-    panorama_res, count, systems2partitions, name2systems, fam_annot = get_panorama_results(panorama_file, position,
-                                                                                            key_prefix)
+    panorama_res, count, systems2partitions, name2systems, fam_annot = get_panorama_results(panorama_file, disable_bar,
+                                                                                            position, key_prefix)
 
     # Storing Panorama results in the shared dictionary with appropriate key prefixes
     return_dict[f'panorama_{key_prefix}_res'] = panorama_res
@@ -87,17 +93,19 @@ def load_panorama_results(panorama_file: Path, return_dict: Dict[str, Any], key_
     return_dict[f'panorama_{key_prefix}_fam_annot'] = fam_annot
 
 
-def load_dfinder_results(dfinder_file: Path, gene2family: Dict[str, str], locus2protID: Optional[Dict[str, str]],
-                         return_dict: Dict[str, Any], position: int = 0) -> None:
+def load_dfinder_results(dfinder_file: Path, gene2family: Dict[str, str], locus2protid: Optional[Dict[str, str]],
+                         return_dict: Dict[str, Any], disable_bar: bool = False, position: int = 0) -> None:
     """Loads Defense Finder results.
 
     Args:
         dfinder_file (str): Path to the Defense Finder results file.
         gene2family (Dict[str, str]): Gene-to-family mapping.
-        locus2protID (Optional[Dict[str, str]]): Locus-to-protein ID mapping.
+        locus2protid (Optional[Dict[str, str]]): Locus-to-protein ID mapping.
         return_dict (Dict[str, Any]): Shared dictionary to store the results.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
     """
-    dfinder_res, count, fam_annot = get_df_results(dfinder_file, gene2family, locus2protID, position)
+    dfinder_res, count, fam_annot = get_df_results(dfinder_file, gene2family, locus2protid, disable_bar, position)
 
     # Storing Defense Finder results in the shared dictionary
     return_dict['dfinder_res'] = dfinder_res
@@ -105,14 +113,17 @@ def load_dfinder_results(dfinder_file: Path, gene2family: Dict[str, str], locus2
     return_dict['dfinder_fam_annot'] = fam_annot
 
 
-def get_padloc_results(padloc_dir: Path, gene2families: Dict[str, str], locus2protID: dict = None, position: int = 0
+def get_padloc_results(padloc_dir: Path, gene2families: Dict[str, str], locus2protid: dict = None,
+                       disable_bar: bool = False, position: int = 0
                        ) -> Tuple[Dict[str, Dict[str, List[Set[str]]]], Dict[str, int], Dict[str, Set[str]]]:
     """Processes Padloc results to map genes to systems, counts, and annotations.
 
     Args:
         padloc_dir (Path): Directory containing Padloc result files.
         gene2families (Dict[str, str]): Mapping from genes to families.
-        locus2protID (dict, optional): Mapping from locus tags to protein IDs. Defaults to None.
+        locus2protid (dict, optional): Mapping from locus tags to protein IDs. Defaults to None.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
 
     Returns:
         Tuple[Dict[str, Dict[str, List[Set[str]]]], Dict[str, int], Dict[str, Set[str]]]:
@@ -124,7 +135,8 @@ def get_padloc_results(padloc_dir: Path, gene2families: Dict[str, str], locus2pr
     systems2count = {}
     fam2annot = {}
 
-    for file in tqdm(list(padloc_dir.rglob('*.csv')), position=position, desc="Read Padloc results"):
+    for file in tqdm(list(padloc_dir.rglob('*.csv')), position=position,
+                     disable=disable_bar, desc="Read Padloc results"):
         padloc_res = pd.read_csv(file, sep=',', header=0)
         genome = file.stem.replace("_protein_padloc", "")
         org2system[genome] = {}
@@ -138,7 +150,7 @@ def get_padloc_results(padloc_dir: Path, gene2families: Dict[str, str], locus2pr
                     systems2count[system_name] += 1
                     subsys = padloc_res[padloc_res["system.number"] == system_id][["target.name", "protein.name"]]
                     for gene, annot in subsys.itertuples(index=False):
-                        prot_id = locus2protID.get(gene, gene) if locus2protID else gene
+                        prot_id = locus2protid.get(gene, gene) if locus2protid else gene
                         gf = gene2families[str(prot_id)]
                         system_family.add(gf)
                         if gf in fam2annot:
@@ -150,14 +162,17 @@ def get_padloc_results(padloc_dir: Path, gene2families: Dict[str, str], locus2pr
     return org2system, systems2count, fam2annot
 
 
-def get_df_results(dfinder_dir: Path, gene2families: Dict[str, str], locus2protID: dict = None, position: int = 0
+def get_df_results(dfinder_dir: Path, gene2families: Dict[str, str], locus2protid: dict = None,
+                   disable_bar: bool = False, position: int = 0
                    ) -> Tuple[Dict[str, Dict[str, List[Set[str]]]], Dict[str, int], Dict[str, Set[str]]]:
     """Processes Defense Finder (Dfinder) results to map genes to systems, counts, and annotations.
 
     Args:
         dfinder_dir (Path): Directory containing Dfinder result files.
         gene2families (Dict[str, str]): Mapping from genes to families.
-        locus2protID (dict, optional): Mapping from locus tags to protein IDs. Defaults to None.
+        locus2protid (dict, optional): Mapping from locus tags to protein IDs. Defaults to None.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
 
     Returns:
         Tuple[Dict[str, Dict[str, List[Set[str]]]], Dict[str, int], Dict[str, Set[str]]]:
@@ -175,16 +190,16 @@ def get_df_results(dfinder_dir: Path, gene2families: Dict[str, str], locus2protI
         Returns:
             str: Extracted locus tag or protein ID.
         """
-        match = re.search(r'prot_([A-Za-z0-9_]+\.\d+)', input_string)
+        match = re.search(r"prot_(\w+\.\d+)", input_string)
         locus_tag = match.group(1)
-        return locus2protID.get(locus_tag, locus_tag) if locus2protID else locus_tag
+        return locus2protid.get(locus_tag, locus_tag) if locus2protid else locus_tag
 
     org2system = {}
     systems2count = {}
     fam2annot = defaultdict(set)
 
     for file in tqdm(list(dfinder_dir.glob("GCF*/*_translated_cds_defense_finder_genes.tsv")), position=position,
-                     desc="Read Defense Finder results"):
+                     disable=disable_bar, desc="Read Defense Finder results"):
         dfinder_res = pd.read_csv(file, sep="\t", header=0)
         genome = file.stem.replace("_translated_cds_defense_finder_genes", "")
         org2system[genome] = {}
@@ -210,12 +225,16 @@ def get_df_results(dfinder_dir: Path, gene2families: Dict[str, str], locus2protI
     return org2system, systems2count, fam2annot
 
 
-def get_panorama_results(panorama_dir: Path, position: int = 0, key: str = "",
+def get_panorama_results(panorama_dir: Path, disable_bar: bool = False,
+                         position: int = 0, key: str = "",
                          ) -> Tuple[dict, dict, dict, dict, dict]:
     """Processes Panorama results to map genes to systems, partitions, counts, and annotations.
 
     Args:
         panorama_dir (Path): Directory containing Panorama result files.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
+        key (str, optional): Key to differentiate between Panorama results. Defaults to "".
 
     Returns:
         Tuple[dict, dict, dict, dict, dict]:
@@ -232,7 +251,8 @@ def get_panorama_results(panorama_dir: Path, position: int = 0, key: str = "",
     name2systems = {}
     fam2annot = {}
 
-    for file in tqdm(list(panorama_dir.glob("*.tsv")), position=position, desc=f"Read Panorama {key} results"):
+    for file in tqdm(list(panorama_dir.glob("*.tsv")), position=position,
+                     disable=disable_bar, desc=f"Read Panorama {key} results"):
         panorama_res = pd.read_csv(file, sep='\t', header=0, dtype={"system number": object})
         genome = file.stem
         org2system[genome] = {}
@@ -256,8 +276,12 @@ def get_panorama_results(panorama_dir: Path, position: int = 0, key: str = "",
 
                             for subsystem_id in sys_df["subsystem number"].unique():
                                 subsys_df = sys_df[sys_df["subsystem number"] == subsystem_id]
-                                for family, annotation, partition in zip(subsys_df["gene family"], subsys_df["annotation"],
-                                                                         subsys_df["partition"]):
+                                for family, annotation, partition in zip(
+                                        subsys_df["gene family"],
+                                        subsys_df["annotation"],
+                                        subsys_df["partition"],
+                                        strict=False
+                                ):
                                     if not pd.isna(annotation):
                                         system_family.add(str(family))
                                         partitions.append(partition)
@@ -282,6 +306,17 @@ def get_panorama_results(panorama_dir: Path, position: int = 0, key: str = "",
 
 
 def read_panorama_pangenome_systems(systems_file: Path):
+    """
+    Reads and processes the panorama pangenome systems data from a specified file.
+
+    Args:
+        systems_file (Path): Path to the tab-separated file containing the panorama pangenome
+            systems data.
+
+    Returns:
+        dict: A dictionary where keys are system names and values are sets of frozensets
+            of model genomic features.
+    """
     systems_df = pd.read_csv(systems_file, sep='\t', header=0, usecols=[0, 1, 4, 6])
     systems_df["model_GF"] = systems_df["model_GF"].str.split(", ").apply(lambda x: frozenset(sorted(x)))
     systems_df["system name"] = systems_df["system name"].apply(lambda x: padloc2dfinder.get(x, x))
