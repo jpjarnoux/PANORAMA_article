@@ -8,7 +8,6 @@ from typing import Dict, Set
 
 import matplotlib.pyplot as plt
 import pandas as pd
-
 from tqdm import tqdm
 
 from sources.dev_utils import type2category
@@ -29,7 +28,7 @@ def parse_systems(sub_data: pd.DataFrame) -> pd.DataFrame:
         """Get unique gene family combinations for a subset of data.
 
         Args:
-            sub_df (pd.DataFrame): Subset of the data.
+            df (pd.DataFrame): Subset of the data.
 
         Returns:
             set: Unique gene family combinations.
@@ -79,7 +78,6 @@ def parse_systems(sub_data: pd.DataFrame) -> pd.DataFrame:
         for larger in filtered_combs:
             if comb.issubset(larger):
                 largest_comb = larger
-                # a = filtered_combs[larger]
                 break
 
         # Update the filtered combinations
@@ -111,17 +109,20 @@ def read_projection(file: Path) -> pd.DataFrame:
         parse_systems)
 
 
-def get_data_projection(projection: Path) -> pd.DataFrame:
+def get_data_projection(projection: Path, disable_bar: bool = False, position: int = 0) -> pd.DataFrame:
     """Read and concatenate projection files.
 
     Args:
         projection (Path): Path to the directory containing projection files.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
 
     Returns:
         pd.DataFrame: Concatenated DataFrame of all projection files.
     """
     spot_df_list = []
-    for file in tqdm(list(projection.glob("*.tsv")), desc="Read projections", position=1, unit="projection"):
+    for file in tqdm(list(projection.glob("*.tsv")), desc="Read projections", disable=disable_bar,
+                     position=position, unit="projection"):
         spot_df = read_projection(file)
         if not spot_df.empty:
             spot_df["spot_sys_organisms"] = file.stem
@@ -130,17 +131,20 @@ def get_data_projection(projection: Path) -> pd.DataFrame:
     return pd.concat(spot_df_list, axis="index")
 
 
-def get_spot2orgs(tables: Path) -> Dict[str, Set[str]]:
+def get_spot2orgs(tables: Path, disable_bar: bool = False, position: int = 0) -> Dict[str, Set[str]]:
     """Map spots to organisms.
 
     Args:
         tables (Path): Path to the directory containing organism tables.
+        disable_bar (bool, optional): Whether to disable the progress bar. Defaults to False.
+        position (int, optional): Position of the progress bar. Defaults to 0.
 
     Returns:
         Dict[str, Set[str]]: Dictionary mapping spots to sets of organisms.
     """
     spot2orgs = defaultdict(set)
-    for file in tqdm(list(tables.glob("*.tsv")), desc="Read tables files", unit="table", position=1):
+    for file in tqdm(list(tables.glob("*.tsv")), desc="Read tables files", unit="table",
+                     disable=disable_bar, position=position):
         org = file.stem
         table_df = pd.read_csv(file, sep="\t", header=0, usecols=["Spot"]).dropna(subset=["Spot"])
         for spot in table_df["Spot"].unique():
@@ -204,7 +208,7 @@ def gen_scatter_plot(data: pd.DataFrame, x_field: str = "spot frequency", x_labe
         min_y_for_text (float): Minimum y-value threshold for labeling spots.
         output (Path): Path to the directory where the plot will be saved.
     """
-    fig, ax = plt.subplots(figsize=(20, 16))
+    plt.subplots(figsize=(20, 16))
     plt.scatter(data[x_field], data[y_field], s=data["diversity"] * 150, c='deepskyblue', alpha=0.7, edgecolors='k')
 
     # Add horizontal and vertical lines at the thresholds
@@ -249,6 +253,9 @@ def scatter_plot(data: pd.DataFrame, spot2orgs: Dict[str, Set[str]], nb_genomes:
         spot2orgs (Dict[str, Set[str]]): Dictionary mapping spots to organisms.
         nb_genomes (int): Total number of genomes.
         output (Path): Path to the directory where plots will be saved.
+        file_name (str): Name of the file to save the plot.
+        min_freq (float): Minimum frequency threshold for labeling spots.
+        min_sys (int): Minimum number of systems threshold for labeling spots.
     """
     parsed_data = parse_data_scatter_plot(data, spot2orgs, nb_genomes)
     parsed_data.to_csv(output/f"{file_name}.tsv", sep="\t", index=True)
