@@ -73,13 +73,13 @@ def parse_data(cs_data: pd.DataFrame, systems: Dict[str, pd.DataFrame],
         with_systems = []
         nb_systems = []
 
-        for i, (pg, spot) in enumerate(zip(pangenomes, spots, strict=False)):
+        for (pg, spot) in zip(pangenomes, spots, strict=False):
             spot_str = f"spot_{spot}"
             systems_set = pangenome_spot_to_systems.get(pg, {}).get(spot_str, set())
             nb_sys = len(systems_set)
             nb_systems.append(nb_sys)
             with_systems.append(nb_sys > 0)
-            all_systems.update(systems_set)  # Add to global set
+            all_systems.update(systems_set)  # Add to the global set
 
         # Calculate summary stats
         cs_nb_sys = len(all_systems)  # Unique systems across all spots
@@ -148,7 +148,20 @@ def parse_data(cs_data: pd.DataFrame, systems: Dict[str, pd.DataFrame],
     result_df = pd.DataFrame(result_rows)
     return result_df
 
+
 def generate_upset_plot_spots(data: pd.DataFrame, pangenome_list: List[str], output, base_font_size: int = 12):
+    """
+    Generates an UpSet plot to visualize the distribution and relationships of spot clusters
+    across given pangenome data, while highlighting counts of conserved systems and spot
+    clusters per dataset. The plot includes several customized visual elements and is saved
+    to multiple formats.
+
+    Args:
+        data (pd.DataFrame): The input DataFrame containing the spot cluster data.
+        pangenome_list (List[str]): A list of column names to set as the index for the UpSet plot.
+        output (Path): The file path where the generated plots will be saved.
+        base_font_size (int): The base font size for labels, annotations, and legends in the plot.
+    """
     binary_df = data.set_index(pangenome_list)
     upset = UpSet(
         binary_df,

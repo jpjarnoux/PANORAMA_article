@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Tuple
 
 # Installed libraries
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 
 # Local libraries
@@ -25,7 +25,7 @@ def load_system_data(results_path: Path) -> pd.DataFrame:
         results_path (Path): Path to the directory containing system data files.
 
     Returns:
-        pd.DataFrame: A DataFrame with aggregated system counts by type for each species.
+        pd.DataFrame: A DataFrame with aggregated systems counts by type for each species.
     """
     df = pd.DataFrame()
     for system_result in results_path.glob("*/dfinder/systems.tsv"):

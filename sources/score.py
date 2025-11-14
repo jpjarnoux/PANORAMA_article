@@ -2,16 +2,16 @@
 # coding:utf-8
 
 # default libraries
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, FrozenSet, List, Set, Tuple, Union
 
 # installed libraries
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # local libraries
-from sources.dev_utils import type2category, similar
+from sources.dev_utils import similar, type2category
 
 
 def write_df(data, out_name, grouped: bool = False):
@@ -53,7 +53,7 @@ def compute_score(systems2pred: Dict[str, List[int]]) -> Tuple[float, float, flo
     Calculate recall, precision, and F1-score for each system type
 
     Args:
-        systems2pred: Dictionary of system type to prediction comparison results
+        systems2pred: Dictionary of system types to prediction comparison results
 
     Returns:
         Dict[str, List[float]]: For each system type the recall, precision and F1-score
@@ -62,7 +62,7 @@ def compute_score(systems2pred: Dict[str, List[int]]) -> Tuple[float, float, flo
     scores = defaultdict(list)
     for system_type, pred in systems2pred.items():
         true_positive, false_negative, false_positive = pred
-        total = [x + y for x, y in zip(total, pred)]
+        total = [x + y for x, y in zip(total, pred, strict=False)]
         recall = true_positive / (true_positive + false_negative) if true_positive + false_negative > 0 else 0
         precision = true_positive / (true_positive + false_positive) if true_positive + false_positive > 0 else 0
         f1_score = 2 * (recall * precision) / (recall + precision) if recall + precision > 0 else 0
@@ -87,10 +87,11 @@ def compute_score_pangenome(panorama: Dict[str, Set[FrozenSet[str]]], other: Dic
     Computes precision, recall, and F1-score for the comparison of two pangenomes.
 
     Args:
-        panorama: Dictionary of systems from the panorama with set of frozen sets.
+        panorama: Dictionary of systems from the panorama with a set of frozen sets.
         other: Dictionary of systems to be compared against the panorama.
         other_name: Name of the other system for output file labeling.
         output: Path where output files will be saved.
+        threshold: Threshold for similarity between systems.
 
     Returns:
         scores: Dictionary containing recall, precision, F1-score, and counts for each system type.
@@ -114,15 +115,13 @@ def compute_score_pangenome(panorama: Dict[str, Set[FrozenSet[str]]], other: Dic
                 for panorama_sys in panorama_systems:
                     inter = other_sys.intersection(panorama_sys)
                     if similar(panorama_sys, other_sys, threshold):
-                        # systems2pred[system_type][0] += 1  # True positive
                         systems2pred[system_type][0] += len(inter)  # True positive
                         common = True
                         seen.add(frozenset(panorama_sys))
                         valid_sys.add(frozenset(panorama_sys))
                 if not common:
                     systems2pred[system_type][1] += len(other_sys)  # False negative
-                    # systems2pred[system_type][1] += 1  # False negative
-                    line = [system_type, ", ".join(sorted(list(map(str, other_sys))))]
+                    line = [system_type, ", ".join(sorted(map(str, other_sys)))]
                     frozen_line = frozenset(line)
                     if frozen_line not in other_no_match_set:
                         other_no_match_set.add(frozen_line)
@@ -134,17 +133,15 @@ def compute_score_pangenome(panorama: Dict[str, Set[FrozenSet[str]]], other: Dic
                 for panorama_sys in panorama_systems:
                     if panorama_sys not in seen:  # and panorama_sys not in valid_sys:
                         systems2pred[system_type][2] += len(panorama_sys)  # False positive
-                        # systems2pred[system_type][2] += 1  # False positive
-                        line = [system_type, ", ".join(sorted(list(map(str, panorama_sys))))]
+                        line = [system_type, ", ".join(sorted(map(str, panorama_sys)))]
                         frozen_line = frozenset(line)
                         if frozen_line not in panorama_no_match_set:
                             panorama_no_match_set.add(frozen_line)
                             panorama_no_match.append(line)
         else:
             systems2pred[system_type][1] += sum(len(sys) for sys in other[system_type])  # False negative
-            # systems2pred[system_type][1] += len(other[system_type])  # False negative
             for system in other[system_type]:
-                line = [system_type, ", ".join(sorted(list(map(str, system))))]
+                line = [system_type, ", ".join(sorted(map(str, system)))]
                 frozen_line = frozenset(line)
                 if frozen_line not in other_no_match_set:
                     other_no_match_set.add(frozen_line)
@@ -155,7 +152,7 @@ def compute_score_pangenome(panorama: Dict[str, Set[FrozenSet[str]]], other: Dic
         for panorama_sys in panorama[system_type]:
             # if panorama_sys not in valid_sys:
             systems2pred[system_type][2] += 1  # False positive
-            line = [system_type, ", ".join(sorted(list(map(str, panorama_sys))))]
+            line = [system_type, ", ".join(sorted(map(str, panorama_sys)))]
             frozen_line = frozenset(line)
             if frozen_line not in panorama_no_match_set:
                 panorama_no_match_set.add(frozen_line)
@@ -180,6 +177,7 @@ def compute_score_organisms(panorama_res: Dict[str, Dict[str, List[Set[str]]]],
         other: Dictionary of systems for each organism in the other result.
         other_name: Name of the other result for output file labeling.
         output: Path where output files will be saved.
+        threshold: Threshold for similarity between systems.
 
     Returns:
         scores: Dictionary containing recall, precision, F1-score, and counts for each system type across organisms.
@@ -204,7 +202,6 @@ def compute_score_organisms(panorama_res: Dict[str, Dict[str, List[Set[str]]]],
                     other_sys = systems[other_index]
                     common = False
                     for panorama_sys in panorama_systems:
-                        inter = other_sys.intersection(panorama_sys)
                         if similar(other_sys, panorama_sys, threshold):
                             systems2pred[system_type][0] += 1  # True positive
                             common = True
@@ -213,8 +210,7 @@ def compute_score_organisms(panorama_res: Dict[str, Dict[str, List[Set[str]]]],
 
                     if not common:
                         systems2pred[system_type][1] += len(other_sys)  # False negative
-                        # systems2pred[system_type][1] += 1  # False negative
-                        line = [organism, system_type, ", ".join(sorted(list(map(str, other_sys))))]
+                        line = [organism, system_type, ", ".join(sorted(map(str, other_sys)))]
                         frozen_line = frozenset(line)
                         if frozen_line not in other_no_match_set:
                             other_no_match_set.add(frozen_line)
@@ -226,17 +222,15 @@ def compute_score_organisms(panorama_res: Dict[str, Dict[str, List[Set[str]]]],
                     for panorama_sys in panorama_systems:
                         if panorama_sys not in seen:  # and panorama_sys not in valid_sys:
                             systems2pred[system_type][2] += len(panorama_sys)  # False positive
-                            # systems2pred[system_type][2] += 1  # False positive
-                            line = [organism, system_type, ", ".join(sorted(list(map(str, panorama_sys))))]
+                            line = [organism, system_type, ", ".join(sorted(map(str, panorama_sys)))]
                             frozen_line = frozenset(line)
                             if frozen_line not in panorama_no_match_set:
                                 panorama_no_match_set.add(frozen_line)
                                 panorama_no_match.append(line)
             else:
                 systems2pred[system_type][1] += sum(len(sys) for sys in systems)  # False negative
-                # systems2pred[system_type][1] += len(other[system_type])  # False negative
                 for system in systems:
-                    line = [organism, system_type, ", ".join(sorted(list(map(str, system))))]
+                    line = [organism, system_type, ", ".join(sorted(map(str, system)))]
                     frozen_line = frozenset(line)
                     if frozen_line not in other_no_match_set:
                         other_no_match_set.add(frozen_line)
@@ -245,9 +239,9 @@ def compute_score_organisms(panorama_res: Dict[str, Dict[str, List[Set[str]]]],
         # Find panorama-only systems that are not in 'other'
         for system_type in panorama_sys_name:
             for system in panorama_res[organism][system_type]:
-                # if system not in valid_sys:
+                # if the system not in valid_sys:
                 systems2pred[system_type][2] += 1  # False positive
-                line = [organism, system_type, ", ".join(sorted(list(map(str, system))))]
+                line = [organism, system_type, ", ".join(sorted(map(str, system)))]
                 frozen_line = frozenset(line)
                 if frozen_line not in panorama_no_match_set:
                     panorama_no_match_set.add(frozen_line)
@@ -263,7 +257,44 @@ def compute_score_organisms(panorama_res: Dict[str, Dict[str, List[Set[str]]]],
 def parse_scores(score_padloc: Dict[str, List[Union[str, float]]],
                  score_dfinder: Dict[str, List[Union[str, float]]]
                  ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Parses the scores from two different scoring systems (`PADLOC` and `Defense-Finder`) and organizes
+    them into DataFrames for recall, precision, F1 score, and count. It consolidates and compares the
+    scores for all systems present in either of the provided score dictionaries (`score_padloc` or
+    `score_dfinder`). The resulting DataFrames are indexed by systems and contain scores for each metric
+    from both scoring systems.
+
+    Args:
+        score_padloc (Dict[str, List[Union[str, float]]]): A dictionary containing scores for the
+            PADLOC system. Keys represent metrics (e.g., "recall", "precision", etc.), with each key
+            mapping to a list of corresponding scores for various systems.
+        score_dfinder (Dict[str, List[Union[str, float]]]): A dictionary containing scores for the
+            Defense-Finder system. Keys represent metrics (e.g., "recall", "precision", etc.), with
+            each key mapping to a list of corresponding scores for various systems.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]: A tuple of pandas DataFrames
+            containing the following:
+            - Recall scores indexed by systems and showing scores for PADLOC and Defense-Finder.
+            - Precision scores indexed by systems and showing scores for PADLOC and Defense-Finder.
+            - F1 scores indexed by systems and showing scores for PADLOC and Defense-Finder.
+            - Counts indexed by systems and showing scores for PADLOC and Defense-Finder.
+    """
     def get_score(dict_score: Dict[str, List[Union[str, float]]], sys_name: str, metric: str) -> float:
+        """
+        Calculates and retrieves the specific score for a given system name and metric from
+        a dictionary of scores.
+
+        Args:
+            dict_score (Dict[str, List[Union[str, float]]]): A dictionary containing scoring data,
+                including metrics, system names, and their associated scores.
+            sys_name (str): The name of the system for which the score is requested.
+            metric (str): The performance metric used to identify the relevant score.
+
+        Returns:
+            float: The specific score corresponding to the provided system name and metric.
+                   Returns 0 if the system name is not found in the dictionary.
+        """
         try:
             score = dict_score[metric][dict_score["systems"].index(sys_name)]
         except ValueError:
@@ -302,6 +333,22 @@ def parse_scores(score_padloc: Dict[str, List[Union[str, float]]],
 
 def group_systems(scores: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame],
                   groups: Tuple[Set[str], Set[str]] = None):
+    """
+    Groups and processes system scores by categories and specified groupings.
+
+    Args:
+        scores: A tuple of pandas DataFrames where each DataFrame represents a specific
+            type of score (e.g., precision, recall, etc.). The last DataFrame in the
+            tuple represents the count data used for weighting computations.
+        groups: Optional. A tuple containing two sets: the first set defines the main
+            category groupings, and the second set defines the items grouped under
+            the 'other' category.
+
+    Returns:
+        List[pd.DataFrame]: A list of pandas DataFrames, where each DataFrame
+            corresponds to a computed score distribution per category for the
+            respective score in the input 'scores'.
+    """
     df_count = scores[3]
     df_count_grouped = df_count.groupby(type2category).sum()
     df_count_grouped = df_count_grouped.groupby(lambda idx: 'other' if idx in groups[1] else idx).sum()
@@ -318,6 +365,21 @@ def group_systems(scores: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Dat
 
 
 def gen_barplot(scores: pd.DataFrame, measure: str, figname: str, output: Path) -> None:
+    """
+    Generates a bar plot visualizing the provided scores and saves it as an image file.
+
+    Args:
+        scores (pd.DataFrame): A DataFrame containing the data to plot. The indices
+            represent labels for the x-axis, and the values correspond to the heights
+            of the bars.
+        measure (str): A string specifying the measure to display in the plot's
+            y-axis label and title.
+        figname (str): The name of the output file where the plot will be saved.
+        output (Path): The directory path where the figure will be saved.
+
+    Returns:
+        None
+    """
     ax = scores.plot.bar(layout="constrained", figsize=(20, 11.25))
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel(f'{measure} (%)')
@@ -334,6 +396,19 @@ def gen_barplot(scores: pd.DataFrame, measure: str, figname: str, output: Path) 
 
 
 def plot_scores(scores_padloc, scores_dfinder, main_group, other_group, output, suffix: str = ""):
+    """
+    Generates and saves bar plots for various measures like recall, precision, and f1-score using scores
+    from provided `scores_padloc` and `scores_dfinder` inputs. The function processes scores, groups
+    them by specified categories, and produces both individual and grouped measure plots.
+
+    Args:
+        scores_padloc: The input scores for the Padloc system.
+        scores_dfinder: The input scores for the DFinder system.
+        main_group: The main group for categorizing systems in grouped plotting.
+        other_group: The other group for categorizing systems in grouped plotting.
+        output: The directory where the generated plots will be saved.
+        suffix: A string suffix to append to the filenames of the saved plots.
+    """
     axes = []
     scores = parse_scores(scores_padloc, scores_dfinder)
     # gen_boxplot(scores[-1])

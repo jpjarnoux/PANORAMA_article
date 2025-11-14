@@ -2,12 +2,12 @@
 # coding: utf-8
 
 # Default libraries
-from typing import Dict, FrozenSet, Set, Tuple
+from collections import defaultdict
+from itertools import chain
 from pathlib import Path
+from typing import Dict, FrozenSet, Set, Tuple
 
 # Installed libraries
-from itertools import chain
-from collections import defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
@@ -103,7 +103,7 @@ def get_common_specified_systems(padloc: Dict[str, Set[FrozenSet[str]]], dfinder
     """
     sys_type_set = set(padloc.keys()).union(dfinder.keys(), panorama.keys())
 
-    subset_dict = {x: 0 for x in ["100", "010", "110", "001", "101", "011", "111"]}
+    subset_dict = dict.fromkeys(["100", "010", "110", "001", "101", "011", "111"], 0)
 
     for sys_type in sys_type_set:
         padloc_systems = padloc.get(sys_type, set())
@@ -231,8 +231,10 @@ def count_system_similar(padloc: Dict[str, Set[FrozenSet[str]]],
     Args:
         padloc (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for PADLOC.
         dfinder (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for DFinder.
-        panorama_padloc (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for PANORAMA compared with PADLOC.
-        panorama_dfinder (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets for PANORAMA compared with DFinder.
+        panorama_padloc (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets
+            for PANORAMA compared with PADLOC.
+        panorama_dfinder (Dict[str, Set[FrozenSet[str]]]): Dictionary of system types and their sets
+            for PANORAMA compared with DFinder.
         output (Path): Path to save the results.
         threshold (float): Threshold for similarity.
     """

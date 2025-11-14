@@ -94,7 +94,7 @@ def generate_tile_plot(pivot: pd.DataFrame, output: Path, base_fontsize: int = 1
     Returns:
         None
     """
-    fig, ax = plt.subplots(figsize=(24, 20))
+    _, ax = plt.subplots(figsize=(24, 20))
 
     sns.heatmap(
         pivot,

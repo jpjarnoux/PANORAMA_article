@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Dict, FrozenSet, Set, Tuple
 
 # installed libraries
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 
 # local libraries
-from sources.dev_utils import type2category, cluster_low_sys
+from sources.dev_utils import cluster_low_sys, type2category
 
 
 def gen_boxplot(count_df: pd.DataFrame, output: Path) -> Tuple[Set[str], Set[str]]:
@@ -50,7 +50,7 @@ def gen_boxplot(count_df: pd.DataFrame, output: Path) -> Tuple[Set[str], Set[str
         figsize=(20, 11.25),
         nrows=2,
         ncols=1,
-        sharex=True,
+        sharex="all",
         gridspec_kw={'height_ratios': [1, 3]}  # Ratio of 1:3 for ax[0] and ax[1]
     )
     sns.boxplot(x='Group', y='Occurrences', hue='Condition', data=count_melt, ax=ax[0], gap=.1)
@@ -102,7 +102,8 @@ def gen_boxplot_pangenome(padloc: Dict[str, Set[FrozenSet[str]]], dfinder: Dict[
     Args:
         padloc (Dict[str, Set[FrozenSet[str]]]): systems predicted by 'Padloc' at pangenome level.
         dfinder (Dict[str, Set[FrozenSet[str]]]): systems predicted by 'DefenseFinder' at pangenome level.
-        panorama (Dict[str, Set[FrozenSet[str]]]): systems predicted by 'PANORAMA' with models from 'PADLOC' & 'DefenseFinder'
+        panorama (Dict[str, Set[FrozenSet[str]]]): systems predicted by 'PANORAMA' with models
+            from 'PADLOC' & 'DefenseFinder'
         output (Path): The output path where the boxplot image will be saved.
 
     Returns:
@@ -118,13 +119,13 @@ def gen_boxplot_pangenome(padloc: Dict[str, Set[FrozenSet[str]]], dfinder: Dict[
             system_types.add(res)
 
     # Convert the set to a sorted list
-    system_types = sorted(list(system_types))
+    system_types = sorted(system_types)
 
     # Create a DataFrame with system_types as the index
     count_df = pd.DataFrame(index=system_types)
 
     # For each tool, count the number of systems per system_type
-    for name, tool in zip(["padloc", "dfinder", "panorama"], [padloc, dfinder, panorama]):
+    for name, tool in zip(["padloc", "dfinder", "panorama"], [padloc, dfinder, panorama], strict=False):
         count_df[name] = count_df.index.map(lambda x: len(tool.get(x, set())))
 
     # Generate and save the boxplot

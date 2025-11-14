@@ -28,14 +28,14 @@ def get_min_total_models(models: Path) -> Dict[str, int]:
     Calculate the minimum total models from a given file path.
 
     Args:
-        models (Path): Path to the models file.
+        models (Path): Path to model files.
 
     Returns:
         Dict[str, int]: A dictionary containing the minimum total for each model.
     """
     min_total = {}
     models_df = pd.read_csv(models, sep="\t", names=['name', 'path'])
-    for idx, model_file in models_df["path"].items():
+    for _, model_file in models_df["path"].items():
         with open(Path(model_file).resolve().as_posix()) as json_file:
             data = json.load(json_file)
             min_total[data["name"]] = data["func_units"][0]["parameters"]["min_total"]
@@ -125,7 +125,7 @@ def calculate_fraction_for_system(data: pd.DataFrame, nb_group: int, key: str, f
         reverse (bool): Whether to reverse the order of the plot bars.
 
     Returns:
-        pd.Series: A series with fraction for each system.
+        pd.Series: A series with a fraction for each system.
     """
     data[f'{key}_list'] = data[key].str.split(', ')
     total = len(set(data[f'{key}_list'].explode().tolist()))
@@ -237,7 +237,7 @@ def create_color_map(system_types: Set[str]) -> Dict[str, str]:
         system_types (Set[str]): Set of system types for which to create a color map.
 
     Returns:
-        Dict[str, str]: A dictionary mapping system types to colors.
+        Dict[str, str]: A dictionary mapping system type to colors.
     """
     # Ensure "Other" is included in system types
     if "Other" not in system_types:
@@ -255,7 +255,7 @@ def create_color_map(system_types: Set[str]) -> Dict[str, str]:
     else:
         # Use a sequential palette for more than 20 groups
         # You can use 'Blues', 'Oranges', or any other sequential palette from Seaborn/Matplotlib
-        # palette = sns.color_palette('deep', num_types, as_cmap=False)  # Sequential palette (e.g., 'Blues')
+        # palette = sns.color_palette('deep', num_types, as_cmap=False) # Sequential palette (e.g., 'Blues')
         dec = 30
         palette = cc.glasbey_bw_minc_20_hue_330_100[dec:num_types + dec]
 
@@ -269,7 +269,7 @@ def create_color_map(system_types: Set[str]) -> Dict[str, str]:
 def spot_occurrence(data: pd.DataFrame, output: Path, field: str = "system name",
                     nb_cols: int = 50, nb_top: int = 19, keep_other_spots: bool = False) -> Tuple[pd.DataFrame, set]:
     """
-    Generate a barplot showing the number of systems per spot, colored by system type.
+    Generate a barplot showing the number of systems per spot, colored by system types.
 
     Args:
         data (pd.DataFrame): DataFrame containing the data.
@@ -319,7 +319,7 @@ def spot_occurrence(data: pd.DataFrame, output: Path, field: str = "system name"
     spot_grouped_type_counts.drop(non_top, axis=1, inplace=True)
     top_types.append("Other")
 
-    # Remove "spot_" prefix from spot names
+    # Remove the "spot_" prefix from spot names
     spot_grouped_type_counts.index = spot_grouped_type_counts.index.str.replace("spot_", '')
 
     return spot_grouped_type_counts, set(top_types)
@@ -327,7 +327,7 @@ def spot_occurrence(data: pd.DataFrame, output: Path, field: str = "system name"
 
 def plot_spot_occurrence(spot_data: pd.DataFrame, color_map: Dict, nb_color_legend: int, ax: plt.Axes = None) -> None:
     """
-    Plot a stacked bar chart of spot occurrences colored by system type.
+    Plot a stacked bar chart of spot occurrences colored by system types.
 
     Args:
         spot_data (pd.DataFrame): DataFrame containing spot occurrence data.
@@ -348,7 +348,7 @@ def plot_spot_occurrence(spot_data: pd.DataFrame, color_map: Dict, nb_color_lege
     ax.tick_params(axis='x', labelsize=base_fontsize)
     ax.tick_params(axis='y', labelsize=base_fontsize)
 
-    # Customize the legend with larger font size
+    # Customize the legend with a larger font size
     ax.legend(title="System Category", fontsize=base_fontsize + 2, title_fontsize=base_fontsize + 4,
               loc='upper right', ncol=nb_color_legend)
 
@@ -428,7 +428,7 @@ def plot_pie(spot_data: pd.DataFrame, color_map: Dict, ax: plt.Axes = None, nb_s
     )
 
     # Draw lines between labels and pie slices
-    for j, text in enumerate(texts):
+    for j in range(len(texts)):
         wedge = wedges[j]
         angle = (wedge.theta2 + wedge.theta1) / 2
         x = np.cos(np.radians(angle))
@@ -477,9 +477,30 @@ def plot_pie_charts(top_spots: list, spot_type_counts: pd.DataFrame, color_map: 
 
 
 def parse_data(projection_df: pd.DataFrame, systems_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Parses and processes data from two DataFrames to generate a new DataFrame with
+    expanded and aggregated system information. The function extracts and combines
+    system-related data from the projection DataFrame, including parsing of set-like string
+    representations, and integrates it with metadata from the systems DataFrame.
+
+    Args:
+        projection_df (pd.DataFrame): A DataFrame containing projection data including
+            system identifiers and overlapping system information.
+        systems_df (pd.DataFrame): A DataFrame containing metadata about systems like
+            system number, name, and category.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing processed and merged information with
+            details about system numbers, names, categories, associated spots, and
+            organisms.
+
+    Raises:
+        Exception: Raised in case of invalid literal evaluation while processing system
+            strings.
+    """
     # Function to parse set/frozenset strings
     def parse_set_string(s):
-        """Convert string representation of set to actual set"""
+        """Convert string representation of a set to an actual set"""
         if pd.isna(s) or s == 'set()':
             return set()
         # Remove 'set(' and ')' or 'frozenset(' and ')'
@@ -491,7 +512,7 @@ def parse_data(projection_df: pd.DataFrame, systems_df: pd.DataFrame) -> pd.Data
         except Exception:
             return set()
 
-    # Create list to store expanded rows
+    # Create a list to store expanded rows
     expanded_rows = []
 
     # Iterate through each row
@@ -528,7 +549,8 @@ def parse_data(projection_df: pd.DataFrame, systems_df: pd.DataFrame) -> pd.Data
     result_df = result_df.sort_values('system number').reset_index(drop=True)
     result_df['system number'] = result_df['system number'].astype(str)
     systems_df["system number"] = systems_df["system number"].astype(str)
-    result_df = result_df.merge(systems_df[['system number', 'system name', 'system category',]], on='system number', how='left')
+    result_df = result_df.merge(systems_df[['system number', 'system name', 'system category',]],
+                                on='system number', how='left')
     return result_df[['system number', 'system name', 'system category', 'spots', 'organism']]
 
 
@@ -574,7 +596,7 @@ def plot_spots_and_pies(projection_data: pd.DataFrame, systems_data: pd.DataFram
     plt.close()
 
     # Plot and save individual pie charts
-    for i, spot in enumerate(top_spots):
+    for spot in top_spots:
         spot_data = spot_type_counts.loc[spot].drop('total')
         fig, ax = plt.subplots(figsize=figsize)
         plot_pie(spot_data, color_map, ax, nb_slice, base_fontsize=24)
@@ -597,7 +619,7 @@ def plot_spots_and_pies(projection_data: pd.DataFrame, systems_data: pd.DataFram
 
     plt.tight_layout()
 
-    # Save the combined figure if output path is provided
+    # Save the combined figure if the output path is provided
     if output:
         plt.savefig(output / "spots_and_pies.png", format='png', dpi=300)
         plt.savefig(output / "spots_and_pies.svg", format='svg')

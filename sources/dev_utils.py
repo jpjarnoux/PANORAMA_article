@@ -2,8 +2,8 @@
 # coding:utf-8
 
 # default libraries
+from collections import Counter, defaultdict
 from typing import Dict, FrozenSet, List, Set, Tuple
-from collections import defaultdict, Counter
 
 padloc2dfinder = {'cbass_type_I': 'CBASS_I', 'cbass_type_II': 'CBASS_II', 'cbass_type_IIs': 'CBASS_IIs',
                   'cbass_type_III': 'CBASS_III', 'cbass_type_IV': 'CBASS_IV',
@@ -234,6 +234,20 @@ type2category = {'CAS_Class1-Subtype-I-A': 'Cas', 'CAS_Class1-Subtype-I-B': 'Cas
 
 
 def vote_partitions(partitions: List[str], threshold: float = 0.7):
+    """
+    Determines the majority vote in a list of partitions based on a threshold.
+
+    Args:
+        partitions (List[str]): A list of partitions or categories for which
+            the majority vote is to be calculated.
+        threshold (float): A float representing the minimum proportion of
+            the most frequent partition required to make a decision. Default
+            is 0.7.
+
+    Returns:
+        str: The majority partition if the threshold is met, otherwise the
+        string "undecided".
+    """
     counter = Counter(partitions)
     max_counter = max(counter.values())
     if max_counter / len(partitions) >= threshold:
@@ -243,7 +257,21 @@ def vote_partitions(partitions: List[str], threshold: float = 0.7):
 
 
 def cluster_low_sys(group_counter: Dict[str, int], threshold: float = 0.85) -> Tuple[Set[str], Set[str]]:
-    # Calculer la somme des individus dans les groupes les plus grands
+    """
+    Clusters systems into two groups based on their size and a given threshold.
+
+    Args:
+        group_counter (Dict[str, int]): A dictionary mapping systems to their respective
+            counts.
+        threshold (float): A float value defining the cumulative proportion (default is
+            0.85). Systems will be grouped into the primary group until the cumulative
+            proportion of their counts meets or exceeds this threshold.
+
+    Returns:
+        Tuple[Set[str], Set[str]]: A tuple of two sets. The first set contains the systems
+            in the primary group, and the second set contains the systems in the secondary
+            group.
+    """
     count_sum = 0
     main_group = set()
     count_total = sum(group_counter.values())
@@ -253,7 +281,6 @@ def cluster_low_sys(group_counter: Dict[str, int], threshold: float = 0.85) -> T
         if count_sum / count_total >= threshold:
             break
 
-    # Regrouper les individus restants dans le groupe "Other"
     others_group = {system for system in group_counter.keys() if system not in main_group}
     return main_group, others_group
 
@@ -279,6 +306,19 @@ def get_tool_systems(tool: Dict[str, Dict[str, List[Set[str]]]]) -> Dict[str, Se
 
 
 def similar(sys1: Set[str], sys2: Set[str], threshold: float = 0.5) -> bool:
+    """
+    Determine whether two sets of strings are similar based on a given threshold.
+
+    Args:
+        sys1: A set of strings representing the first collection of elements.
+        sys2: A set of strings representing the second collection of elements.
+        threshold: A float value that defines the minimum similarity score required
+            for the sets to be considered similar. Defaults to 0.5.
+
+    Returns:
+        bool: True if the similarity score is greater than or equal to the threshold,
+        False otherwise.
+    """
     inter = sys1 & sys2
     minimum = min(len(sys1), len(sys2))
     similarity = len(inter) / minimum
@@ -290,12 +330,28 @@ def merge_results(
         dict2: Dict[str, Set[FrozenSet[str]]],
         threshold: float = 0.5
 ) -> Dict[str, Set[FrozenSet[str]]]:
+    """
+    Merges the values of two dictionaries, merging similar frozen sets based on a threshold.
+
+    Args:
+        dict1 (Dict[str, Set[FrozenSet[str]]]): The first input dictionary where
+            each key maps to a set of frozen sets.
+        dict2 (Dict[str, Set[FrozenSet[str]]]): The second input dictionary with a
+            similar structure to `dict1`.
+        threshold (float): A similarity threshold between 0 and 1. Frozen sets are
+            merged when the similarity score exceeds this value. Default is 0.5.
+
+    Returns:
+        Dict[str, Set[FrozenSet[str]]]: A dictionary where each key corresponds to
+            a set of merged frozen sets, combining information from both `dict1`
+            and `dict2`.
+    """
     merged_dict = {}
 
     # Combine keys from both dictionaries
     for key in set(dict1.keys()).union(dict2.keys()):
         all_frozensets = list(dict1.get(key, set())) + list(dict2.get(key, set()))
-        all_frozensets = list(sorted(all_frozensets, key=len, reverse=True))
+        all_frozensets = sorted(all_frozensets, key=len, reverse=True)
         merged_set = []
 
         while all_frozensets:
