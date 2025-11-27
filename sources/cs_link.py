@@ -94,21 +94,21 @@ def generate_tile_plot(pivot: pd.DataFrame, output: Path, base_fontsize: int = 1
     Returns:
         None
     """
-    _, ax = plt.subplots(figsize=(24, 20))
+    _, ax = plt.subplots(figsize=(35, 20))
 
     sns.heatmap(
-        pivot,
+        pivot.T,
         annot=False,
         cmap="rocket_r",
         xticklabels=True,
         yticklabels=True,
         ax=ax
     )
-
-    ax.set_ylabel("Cluster", fontsize=base_fontsize + 2)
-    ax.set_xlabel("System category", fontsize=base_fontsize + 2)
-    ax.tick_params(axis='y', labelsize=base_fontsize, rotation=0)
-    ax.tick_params(axis='x', labelsize=base_fontsize)
+    ax.invert_xaxis()
+    ax.set_xlabel("Cluster", fontsize=base_fontsize + 2)
+    ax.set_ylabel("System category", fontsize=base_fontsize + 2)
+    ax.tick_params(axis='x', labelsize=base_fontsize, rotation=90)
+    ax.tick_params(axis='y', labelsize=base_fontsize)
 
     colorbar = ax.collections[0].colorbar
     colorbar.ax.tick_params(labelsize=base_fontsize)
