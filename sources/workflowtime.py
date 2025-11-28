@@ -87,6 +87,7 @@ def plot_workflowtime(data: Dict[str, Dict[str, float]], species2genomes: Dict[s
     ax1.set_xticks(x)
     ax1.set_xticklabels(species_list, rotation=45, ha='right', style='italic')
     ax1.tick_params(axis='y', labelcolor='black')
+    ax1.set_axisbelow(True)
     ax1.grid(axis='y', alpha=0.3, linestyle='--')
 
     # Secondary y-axis (number of genomes)
